@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useDragControls, type PanInfo } from 'framer-motion'
+import { AnimatePresence, motion, useDragControls, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useEffect, useId, type PointerEvent, type ReactNode } from 'react'
 import { useKeyboardInset, useViewportHeight } from '@/lib/viewport'
@@ -21,6 +21,10 @@ interface ModalProps {
 export function Modal({ open, title, onClose, children, tall = false }: ModalProps) {
   const titleId = useId()
   const drag = useDragControls()
+  // Фон тьмяніє плавно, поки шторку тягнуть вниз
+  // Під час появи/закриття y — рядок '100%' (тоді фоном керує обгортка), під час перетягування — пікселі.
+  const y = useMotionValue<number | string>(0)
+  const backdropOpacity = useTransform(y, (v) => (typeof v === 'number' ? Math.min(Math.max(1 - v / 320, 0), 1) : 1))
   const keyboard = useKeyboardInset()
   const viewport = useViewportHeight()
 
@@ -53,13 +57,15 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+          <motion.div className="absolute inset-0 bg-black/70" style={{ opacity: backdropOpacity }} onClick={onClose} />
           <motion.div
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="relative flex w-full max-w-[480px] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-line bg-card shadow-2xl"
-            style={{ marginBottom: keyboard, maxHeight, ...(tall ? { height: maxHeight } : {}) }}
+            // data-kb: клавіатура відкрита — низу шторки не потрібен відступ під home indicator
+            data-kb={keyboard > 0 || undefined}
+            className="group relative flex w-full max-w-[480px] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-line bg-card shadow-2xl"
+            style={{ y, marginBottom: keyboard, maxHeight, ...(tall ? { height: maxHeight } : {}) }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -96,7 +102,7 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
 /** Низ шторки з головною кнопкою: прилипає до низу, тож видимий і над клавіатурою. */
 export function SheetFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-0 -mx-5 mt-auto flex gap-3 border-t border-line bg-card px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="sticky bottom-0 -mx-5 mt-auto flex gap-3 border-t border-line bg-card px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] group-data-[kb]:pb-3">
       {children}
     </div>
   )

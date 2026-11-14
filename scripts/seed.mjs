@@ -13,6 +13,15 @@ const args = process.argv.slice(2)
 const resetBody = args.includes('--reset-body')
 const base = (args.find((a) => !a.startsWith('--')) || 'http://127.0.0.1:5173').replace(/\/$/, '')
 
+// На задеплоєній версії мок-дані потрапили б у справжній щоденник і гру (монети, ачівки)
+if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(base) && !args.includes('--force')) {
+  console.error(
+    `✗ ${base} — не локальна адреса. Мокові записи нарахують монети й відкриють ачівки у справжньому стані гри.` +
+      '\n  Якщо це свідомо — додайте --force.',
+  )
+  process.exit(1)
+}
+
 /** @param {string} method @param {string} path @param {unknown} [body] @returns {Promise<any>} */
 async function req(method, path, body) {
   const res = await fetch(`${base}${path}`, {

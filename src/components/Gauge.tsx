@@ -42,6 +42,7 @@ export function Gauge({ value, over = false, children, className }: GaugeProps) 
   const knobX = useTransform(angle, (a) => 100 + R * Math.cos(a))
   const knobY = useTransform(angle, (a) => 100 + R * Math.sin(a))
   const visible = useTransform(progress, (p) => (p > 0.004 ? 1 : 0))
+  const glow = useTransform(progress, (p) => (p > 0.004 ? 0.28 : 0))
   const accent = over ? 'var(--danger)' : 'var(--accent-primary)'
 
   return (
@@ -72,13 +73,8 @@ export function Gauge({ value, over = false, children, className }: GaugeProps) 
           style={{ pathLength: progress, opacity: visible, filter: `drop-shadow(0 0 7px ${accent})` }}
         />
         {/* Світна точка на кінці дуги */}
-        <motion.circle
-          r="7.5"
-          cx={knobX}
-          cy={knobY}
-          fill="white"
-          style={{ opacity: visible, filter: `drop-shadow(0 0 6px ${accent})` }}
-        />
+        <motion.circle r="12" cx={knobX} cy={knobY} style={{ opacity: glow, fill: accent }} />
+        <motion.circle r="7.5" cx={knobX} cy={knobY} fill="white" style={{ opacity: visible }} />
         <motion.circle r="3" cx={knobX} cy={knobY} style={{ opacity: visible, fill: accent }} />
       </svg>
       {/* Вміст обмежено внутрішньою областю дуги */}

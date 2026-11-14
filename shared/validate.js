@@ -56,9 +56,14 @@ function num(v, field, min, max) {
 /** @param {unknown} v @param {string} field @param {number} min @param {number} max */
 const optNum = (v, field, min, max) => (isBlank(v) ? 0 : num(v, field, min, max))
 
-/** @param {unknown} v @param {string} field */
+/**
+ * Мітка часу; не з майбутнього понад добу (інакше LWW-запис став би «вічним»).
+ * @param {unknown} v @param {string} field
+ */
 function timestamp(v, field) {
-  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v <= 0) throw new ValidationError(field)
+  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v <= 0 || v > Date.now() + 86_400_000) {
+    throw new ValidationError(field)
+  }
   return v
 }
 

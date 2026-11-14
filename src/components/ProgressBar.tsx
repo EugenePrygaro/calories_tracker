@@ -10,6 +10,8 @@ interface ProgressBarProps {
   trackClassName?: string
   /** Затримка бліку (с), щоб сусідні бари не блищали одночасно. */
   sheenDelay?: number
+  /** Назва для екранних читалок, напр. «Білки» */
+  label?: string
   className?: string
 }
 
@@ -20,6 +22,7 @@ export function ProgressBar({
   barClassName = 'bg-accent-gradient',
   trackClassName = 'bg-white/[0.06]',
   sheenDelay = 0,
+  label,
   className,
 }: ProgressBarProps) {
   const pct = max > 0 ? Math.min(value / max, 1) * 100 : 0
@@ -29,12 +32,13 @@ export function ProgressBar({
     <div
       className={cn('track-inset h-2 w-full overflow-hidden rounded-full', trackClassName, className)}
       role="progressbar"
+      aria-label={label}
       aria-valuenow={Math.round(value)}
       aria-valuemin={0}
       aria-valuemax={Math.round(max)}
     >
       <motion.div
-        className={cn('bar-gloss h-full rounded-full', over ? 'bg-over' : barClassName)}
+        className={cn('h-full rounded-full', pct > 0 && 'bar-gloss', over ? 'bg-over' : barClassName)}
         style={{ '--sheen-delay': `${sheenDelay}s` } as MotionStyle}
         initial={{ width: 0 }}
         animate={{ width: `${pct}%` }}

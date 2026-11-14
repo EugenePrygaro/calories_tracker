@@ -35,7 +35,7 @@ export function DailySummary({ entries }: { entries: readonly Entry[] }) {
             exit={{ opacity: 0, scale: 0.9, filter: 'blur(4px)' }}
             className="flex flex-col items-center"
           >
-            <span className="text-[9.5px] tracking-[0.18em] text-muted uppercase">
+            <span className="text-[10px] tracking-[0.16em] text-muted uppercase">
               {over ? 'Понад норму' : 'Залишилось'}
             </span>
             <AnimatedNumber
@@ -58,10 +58,10 @@ export function DailySummary({ entries }: { entries: readonly Entry[] }) {
             Ціль <b className="text-fg">{kcal(goals.kcal)}</b>
           </span>
         </div>
-        <ProgressBar value={totals.kcal} max={goals.kcal} className="h-3" />
+        <ProgressBar value={totals.kcal} max={goals.kcal} className="h-3" label="Калорії" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 pt-1">
+      <div className="grid grid-cols-3 gap-3 pt-1">
         {MACROS.map((m, i) => (
           <div key={m.key} className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between">
@@ -74,6 +74,7 @@ export function DailySummary({ entries }: { entries: readonly Entry[] }) {
             </div>
             <ProgressBar
               value={totals[m.key]}
+              label={m.label}
               max={goals[m.key]}
               barClassName={m.bar}
               trackClassName={m.track}

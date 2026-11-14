@@ -15,15 +15,15 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
   const layoutId = useId()
 
   return (
-    <div role="tablist" aria-label={label} className={cn('flex gap-1 rounded-2xl bg-elevated p-1', className)}>
+    <div role="radiogroup" aria-label={label} className={cn('flex gap-1 rounded-2xl bg-elevated p-1', className)}>
       {options.map((o) => {
         const active = o.value === value
         return (
           <button
             key={o.value}
             type="button"
-            role="tab"
-            aria-selected={active}
+            role="radio"
+            aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cn(
               'relative flex-1 rounded-xl px-2 py-2 text-sm font-medium transition-colors',

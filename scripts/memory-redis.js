@@ -54,6 +54,7 @@ export class MemoryRedis {
       this.volatile.set(k, { value: clone(v), expiresAt: Date.now() + opts.ex * 1000 })
       return 'OK'
     }
+    this.volatile.delete(k)
     this.data.set(k, clone(v))
     this.persist()
     return 'OK'

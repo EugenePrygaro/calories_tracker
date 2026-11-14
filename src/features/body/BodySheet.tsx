@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { NumberField } from '@/components/ui/Field'
 import { SheetFooter } from '@/components/ui/Modal'
 import { Segmented } from '@/components/ui/Segmented'
-import { deleteBodyRecord, saveBodyRecord, useBody, useTargetWeight, type BodyInput } from '@/data/store'
+import { deleteBodyRecord, saveBodyRecord, useBody, useDataStore, useTargetWeight, type BodyInput } from '@/data/store'
 import { latestMeasure, weightSeries } from '@/lib/body'
 import { addDays, formatDateKey, toDateKey } from '@/lib/date'
 import { cm, kg, signed } from '@/lib/format'
@@ -26,6 +26,7 @@ const RANGE_DAYS: Record<Range, number | null> = { '1m': 30, '3m': 91, '1y': 365
 /** Шторка «Параметри тіла»: графік ваги, заміри за вибраний день, історія. */
 export function BodySheet() {
   const records = useBody()
+  const bodyLoaded = useDataStore((s) => s.bodyLoaded)
   const target = useTargetWeight()
   const date = useUiStore((s) => s.selectedDate)
   const [range, setRange] = useState<Range>('3m')
@@ -40,7 +41,7 @@ export function BodySheet() {
       {/* Фільтр періоду — над графіком, впливає на графік і підсумок */}
       <Segmented label="Період" value={range} options={RANGES} onChange={setRange} />
 
-      <section className="card-static flex flex-col gap-2 rounded-3xl p-4">
+      <section className="card flex flex-col gap-2 rounded-3xl p-4">
         <div className="flex items-baseline justify-between">
           <h3 className="text-sm font-bold">Вага</h3>
           {change !== null && (
@@ -52,7 +53,7 @@ export function BodySheet() {
         <WeightChart points={points} target={target} />
       </section>
 
-      <BodyForm key={date} date={date} record={records.find((r) => r.date === date)} records={records} />
+      <BodyForm key={`${date}-${bodyLoaded}`} date={date} record={records.find((r) => r.date === date)} records={records} />
 
       <History records={records} />
     </div>

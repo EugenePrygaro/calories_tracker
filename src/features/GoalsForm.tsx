@@ -5,13 +5,25 @@ import { sanitizeProfile } from '@shared/validate.js'
 import { Button } from '@/components/ui/Button'
 import { NumberField } from '@/components/ui/Field'
 import { SheetFooter } from '@/components/ui/Modal'
-import { saveProfile, useGoals, useTargetWeight } from '@/data/store'
+import { saveProfile, useDataStore, useGoals, useTargetWeight } from '@/data/store'
 import { kcal, parseNum } from '@/lib/format'
 
 type GoalsInput = Record<keyof Goals, string>
 
-/** Профіль: денні норми та цільова вага. */
+/**
+ * Профіль: денні норми та цільова вага.
+ * Поки профіль не завантажено, форму не показуємо: інакше в ній стояли б цілі
+ * за замовчуванням, і збереження перезаписало б справжні.
+ */
 export function GoalsForm({ onDone }: { onDone: () => void }) {
+  const loaded = useDataStore((s) => s.profile !== null)
+  if (!loaded) {
+    return <p className="py-10 text-center text-sm text-muted">Завантажуємо профіль… Перевірте з’єднання.</p>
+  }
+  return <GoalsFormInner onDone={onDone} />
+}
+
+function GoalsFormInner({ onDone }: { onDone: () => void }) {
   const goals = useGoals()
   const target = useTargetWeight()
   const [f, setF] = useState<GoalsInput>({

@@ -9,12 +9,13 @@
  *   1. CDN Vercel — повторний запит узагалі не викликає функцію;
  *   2. Redis — якщо CDN-копії в цьому регіоні немає, OFF не смикаємо.
  */
-import { HttpError, handler, query, sendCdnCached } from '../server/http.js'
+import { HttpError, handler, query, send, sendCdnCached } from '../server/http.js'
 import { searchOff } from '../server/off.js'
 import { KEYS, parseStored, redis } from '../server/store.js'
 import { LIMITS, normalizeQuery } from '../shared/model.js'
 
 const CACHE_TTL_SEC = 24 * 60 * 60
+const EMPTY_TTL_SEC = 10 * 60
 
 export default handler(['GET'], async (req, res) => {
   const raw = query(req, 'q')
@@ -27,6 +28,11 @@ export default handler(['GET'], async (req, res) => {
   if (Array.isArray(cached)) return sendCdnCached(res, { results: cached, cached: true }, CACHE_TTL_SEC)
 
   const results = await searchOff(q)
+  // Порожня відповідь може бути збоєм OFF — кешуємо коротко і не на CDN
+  if (results.length === 0) {
+    await r.set(key, results, { ex: EMPTY_TTL_SEC })
+    return send(res, 200, { results, cached: false })
+  }
   await r.set(key, results, { ex: CACHE_TTL_SEC })
   sendCdnCached(res, { results, cached: false }, CACHE_TTL_SEC)
 })

@@ -8,8 +8,13 @@ import { BodyCard } from '@/features/body/BodyCard'
 import { DailySummary } from '@/features/DailySummary'
 import { DateHeader } from '@/features/DateHeader'
 import { DevPanel } from '@/features/dev/DevPanel'
+import { AchievementUnlockModal } from '@/features/game/AchievementUnlockModal'
+import { RewardFeed } from '@/features/game/RewardFeed'
+import { StreakNotice } from '@/features/game/StreakNotice'
 import { MealSection } from '@/features/MealSection'
 import { ModalHost } from '@/features/ModalHost'
+import { cn } from '@/lib/cn'
+import { haptic } from '@/lib/haptics'
 import { mealByTime, useUiStore } from '@/store/ui'
 
 /** Свайп по дню: вліво — наступний, вправо — попередній. */
@@ -48,13 +53,19 @@ export default function App() {
   const onSwipe = (_: unknown, info: PanInfo) => {
     const { offset, velocity } = info
     if (Math.abs(offset.y) > Math.abs(offset.x)) return // це був скрол
-    if (offset.x < -SWIPE_DISTANCE || velocity.x < -SWIPE_VELOCITY) shiftDate(1)
-    else if (offset.x > SWIPE_DISTANCE || velocity.x > SWIPE_VELOCITY) shiftDate(-1)
+    if (offset.x < -SWIPE_DISTANCE || velocity.x < -SWIPE_VELOCITY) {
+      haptic()
+      shiftDate(1)
+    } else if (offset.x > SWIPE_DISTANCE || velocity.x > SWIPE_VELOCITY) {
+      haptic()
+      shiftDate(-1)
+    }
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[480px] flex-col gap-4 overflow-x-clip px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+    <div className="relative mx-auto flex w-full max-w-[480px] flex-col gap-4 overflow-x-clip px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
       <DateHeader />
+      <StreakNotice />
 
       {day.error && (
         <button
@@ -68,38 +79,42 @@ export default function App() {
         </button>
       )}
 
-      <AnimatePresence mode="popLayout" initial={false} custom={direction}>
-        <motion.div
-          key={date}
-          custom={direction}
-          variants={slide}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ type: 'spring', stiffness: 420, damping: 40 }}
-          // Лише розпізнаємо жест (без перетягування елемента); вертикальний скрол — за браузером.
-          onPanEnd={onSwipe}
-          style={{ touchAction: 'pan-y' }}
-          className={day.loaded ? 'flex flex-col gap-4' : 'flex flex-col gap-4 opacity-50 transition-opacity'}
-        >
-          {[
-            <DailySummary key="summary" entries={day.entries} />,
-            ...MEAL_TYPES.map((meal) => (
-              <MealSection key={meal} meal={meal} entries={day.entries.filter((e) => e.meal === meal)} />
-            )),
-          ].map((card, i) => (
-            <motion.div
-              key={card.key}
-              custom={i}
-              variants={intro}
-              initial={introPlayed ? false : 'hidden'}
-              animate="show"
-            >
-              {card}
-            </motion.div>
-          ))}
+      {/* Свайп по дню: лише розпізнаємо жест (без перетягування); вертикальний скрол — за браузером */}
+      <motion.div
+        onPanEnd={onSwipe}
+        style={{ touchAction: 'pan-y' }}
+        className={cn('relative flex flex-col gap-4 transition-opacity', !day.loaded && 'opacity-50')}
+      >
+        {/* Дашборд не перебудовується між днями: дуга й числа плавно перетікають з попереднього дня */}
+        <motion.div custom={0} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show">
+          <DailySummary entries={day.entries} />
         </motion.div>
-      </AnimatePresence>
+
+        <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+          <motion.div
+            key={date}
+            custom={direction}
+            variants={slide}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 420, damping: 40 }}
+            className="flex flex-col gap-4"
+          >
+            {MEAL_TYPES.map((meal, i) => (
+              <motion.div
+                key={meal}
+                custom={i + 1}
+                variants={intro}
+                initial={introPlayed ? false : 'hidden'}
+                animate="show"
+              >
+                <MealSection meal={meal} entries={day.entries.filter((e) => e.meal === meal)} />
+              </motion.div>
+            ))}
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
 
       {/* Особисті параметри — не залежать від дня, тому поза каруселлю днів */}
       <motion.div custom={5} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show">
@@ -133,6 +148,8 @@ export default function App() {
 
       <ModalHost />
       <Toast />
+      <RewardFeed />
+      <AchievementUnlockModal />
       <DevPanel />
     </div>
   )

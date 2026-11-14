@@ -47,7 +47,13 @@ export function sendCdnCached(res, body, seconds) {
 
 /** Тіло запиту як об'єкт (Vercel розбирає JSON сам, але підстрахуємося). @param {ApiRequest} req */
 export function readJson(req) {
-  const body = req.body
+  /** @type {unknown} */
+  let body
+  try {
+    body = req.body // на Vercel це геттер, що кидає помилку на некоректному JSON
+  } catch {
+    throw new HttpError(400, 'invalid_json')
+  }
   if (body && typeof body === 'object' && !Buffer.isBuffer(body)) {
     return /** @type {Record<string, unknown>} */ (body)
   }

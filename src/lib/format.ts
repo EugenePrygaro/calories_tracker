@@ -1,13 +1,16 @@
 import type { Nutrients } from '@shared/model.js'
 
-const int = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 })
+const intFmt = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 })
+
+/** Ціле число з пробілами між розрядами: «12 345». */
+export const int = (n: number) => intFmt.format(Math.round(n))
 const dec = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 1 })
 
 /** Калорії — цілим числом: «1 234». */
-export const kcal = (n: number) => int.format(Math.round(n))
+export const kcal = int
 
 /** Грами: до 10 г з десятою частиною («2,5»), далі цілим. */
-export const grams = (n: number) => (Math.abs(n) < 10 ? dec.format(n) : int.format(Math.round(n)))
+export const grams = (n: number) => (Math.abs(n) < 10 ? dec.format(n) : int(n))
 
 const one = new Intl.NumberFormat('uk-UA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 

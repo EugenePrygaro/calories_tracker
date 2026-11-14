@@ -8,10 +8,20 @@ export type Modal =
   | { type: 'edit'; date: DateKey; entryId: string }
   | { type: 'goals' }
   | { type: 'body' }
+  | { type: 'achievements' }
 
-export interface Toast {
+interface Toast {
   id: number
   message: string
+  /** error — червоний (не вдалося), info — нейтральний (наприклад, «Видалено») */
+  tone: 'error' | 'info'
+  /** Кнопка дії в тості, напр. «Повернути» */
+  action?: { label: string; run: () => void }
+}
+
+interface ToastOptions {
+  tone?: Toast['tone']
+  action?: Toast['action']
 }
 
 interface UiState {
@@ -25,7 +35,7 @@ interface UiState {
   goToday: () => void
   openModal: (modal: Modal) => void
   closeModal: () => void
-  showToast: (message: string) => void
+  showToast: (message: string, opts?: ToastOptions) => void
   hideToast: () => void
 }
 
@@ -46,7 +56,8 @@ export const useUiStore = create<UiState>()((set) => ({
     }),
   openModal: (modal) => set({ modal }),
   closeModal: () => set({ modal: null }),
-  showToast: (message) => set({ toast: { id: ++toastId, message } }),
+  showToast: (message, opts = {}) =>
+    set({ toast: { id: ++toastId, message, tone: opts.tone ?? 'error', ...(opts.action ? { action: opts.action } : {}) } }),
   hideToast: () => set({ toast: null }),
 }))
 

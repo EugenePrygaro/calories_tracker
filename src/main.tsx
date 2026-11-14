@@ -1,3 +1,4 @@
+import { MotionConfig } from 'framer-motion'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
@@ -10,11 +11,23 @@ import './index.css'
 import App from './App.tsx'
 import { startAutoRefresh } from './data/store'
 
-registerSW({ immediate: true })
+// Нова версія застосунку: оновлюємось, коли вкладку сховали, — не перериваємо введення
+let updateReady = false
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    updateReady = true
+  },
+})
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && updateReady) void updateSW(true)
+})
 startAutoRefresh()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <MotionConfig reducedMotion="user">
+      <App />
+    </MotionConfig>
   </StrictMode>,
 )

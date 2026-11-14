@@ -3,6 +3,7 @@ import { Modal } from '@/components/ui/Modal'
 import { useUiStore, type Modal as ModalState } from '@/store/ui'
 import { AddFoodSheet } from './add/AddFoodSheet'
 import { BodySheet } from './body/BodySheet'
+import { AchievementsSheet } from './game/AchievementsSheet'
 import { EditEntryForm } from './EditEntryForm'
 import { GoalsForm } from './GoalsForm'
 
@@ -16,6 +17,8 @@ function titleOf(m: ModalState): string {
       return 'Профіль і цілі'
     case 'body':
       return 'Параметри тіла'
+    case 'achievements':
+      return 'Досягнення'
   }
 }
 
@@ -29,13 +32,14 @@ export function ModalHost() {
   if (modal && modal !== shown) setShown(modal)
 
   return (
-    <Modal open={modal !== null} title={shown ? titleOf(shown) : ''} onClose={close} tall={shown?.type === 'add' || shown?.type === 'body'}>
+    <Modal open={modal !== null} title={shown ? titleOf(shown) : ''} onClose={close} tall={shown?.type === 'add' || shown?.type === 'body' || shown?.type === 'achievements'}>
       {shown?.type === 'add' && <AddFoodSheet key={JSON.stringify(shown)} initialMeal={shown.meal} onDone={close} />}
       {shown?.type === 'edit' && (
         <EditEntryForm key={shown.entryId} date={shown.date} entryId={shown.entryId} onDone={close} />
       )}
       {shown?.type === 'goals' && <GoalsForm onDone={close} />}
       {shown?.type === 'body' && <BodySheet />}
+      {shown?.type === 'achievements' && <AchievementsSheet />}
     </Modal>
   )
 }

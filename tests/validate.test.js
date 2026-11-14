@@ -56,6 +56,12 @@ test('відхиляє некоректні дані', () => {
   assert.throws(() => sanitizeEntry({ ...ok, mode: 'other' }), /invalid_mode/)
 })
 
+test('мітка часу з далекого майбутнього відхиляється (інакше LWW-запис став би «вічним»)', () => {
+  const ok = { ...base, mode: 'quick', kcal: 100, protein: 1 }
+  assert.doesNotThrow(() => sanitizeEntry({ ...ok, updatedAt: Date.now() + 60_000 }))
+  assert.throws(() => sanitizeEntry({ ...ok, updatedAt: Date.now() + 3 * 86_400_000 }), /invalid_updatedAt/)
+})
+
 test('requireDate приймає лише реальні дати', () => {
   assert.equal(requireDate('2028-02-29'), '2028-02-29')
   assert.throws(() => requireDate('2026-02-30'))

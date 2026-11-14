@@ -20,7 +20,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': нова версія застосовується, коли вкладку сховали (див. main.tsx), а не посеред введення
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'Calories Tracker',
@@ -46,8 +47,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Кешуємо лише оболонку застосунку. Дані офлайн живуть в IndexedDB (Dexie),
-        // тож /api сервіс-воркер не чіпає взагалі.
+        // Кешуємо лише оболонку застосунку (миттєвий старт і робота без мережі).
+        // Дані живуть у Redis на сервері, тож /api сервіс-воркер не чіпає взагалі.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],

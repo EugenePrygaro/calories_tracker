@@ -7,6 +7,7 @@ import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { KEYS, setRedisClient } from '../server/store.js'
+import { DEFAULT_GOALS } from '../shared/model.js'
 import { MemoryRedis } from './memory-redis.js'
 import { MOCK_TARGET_WEIGHT, mockBody, mockEntries, mockFoods, todayKey } from './mock-data.js'
 
@@ -36,7 +37,7 @@ if (!process.env.NO_SEED && !(await store.hgetall(KEYS.body))) {
   const profile = /** @type {{ goals?: unknown, targetWeight?: unknown } | null} */ (await store.get(KEYS.profile))
   if (!profile?.targetWeight) {
     await store.set(KEYS.profile, {
-      goals: profile?.goals ?? { kcal: 2000, protein: 120, fat: 70, carbs: 220 },
+      goals: profile?.goals ?? DEFAULT_GOALS,
       targetWeight: MOCK_TARGET_WEIGHT,
       updatedAt: Date.now(),
     })

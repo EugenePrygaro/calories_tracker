@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { cn } from '@/lib/cn'
 
 interface SwitchProps {
@@ -28,11 +29,11 @@ export function Switch({ checked, onChange, label, hint }: SwitchProps) {
           checked ? 'bg-primary' : 'bg-line',
         )}
       >
-        <span
-          className={cn(
-            'absolute top-1 size-5 rounded-full bg-white shadow transition-all',
-            checked ? 'left-6' : 'left-1',
-          )}
+        <motion.span
+          className="absolute top-1 left-1 size-5 rounded-full bg-white shadow"
+          animate={{ x: checked ? 20 : 0 }}
+          whileTap={{ scaleX: 1.2 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         />
       </span>
     </button>

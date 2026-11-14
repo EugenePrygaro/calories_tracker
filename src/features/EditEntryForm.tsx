@@ -5,7 +5,7 @@ import { scale } from '@shared/nutrition.js'
 import { Button } from '@/components/ui/Button'
 import { Field, NumberField } from '@/components/ui/Field'
 import { SheetFooter } from '@/components/ui/Modal'
-import { deleteEntry, updateEntry, useEntry, type EntryPatch } from '@/data/store'
+import { removeEntry, updateEntry, useEntry, type EntryPatch } from '@/data/store'
 import { grams, kcal, parseNum } from '@/lib/format'
 import { NutrientsPreview } from './NutrientsPreview'
 
@@ -16,12 +16,15 @@ interface EditEntryFormProps {
 }
 
 export function EditEntryForm({ date, entryId, onDone }: EditEntryFormProps) {
-  const entry = useEntry(date, entryId)
+  const live = useEntry(date, entryId)
+  // Тримаємо останню версію: після видалення шторка закривається з анімацією і не «схлопується»
+  const [entry, setEntry] = useState(live)
+  if (live && live !== entry) setEntry(live)
 
-  // Запис видалили (тут або на іншому пристрої) — закриваємо модалку.
+  // Запис видалили — закриваємо модалку.
   useEffect(() => {
-    if (!entry) onDone()
-  }, [entry, onDone])
+    if (!live) onDone()
+  }, [live, onDone])
 
   if (!entry) return null
   return entry.mode === 'weight' && entry.per100 ? (
@@ -40,7 +43,7 @@ function commit(entry: Entry, patch: EntryPatch, onDone: () => void) {
 }
 
 function remove(entry: Entry, onDone: () => void) {
-  void deleteEntry(entry).catch(() => {})
+  removeEntry(entry) // тост «Видалено · Повернути»
   onDone()
 }
 

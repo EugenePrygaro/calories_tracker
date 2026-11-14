@@ -24,9 +24,8 @@ async function shutdown(code = 0) {
 
 process.once('SIGINT', () => void shutdown())
 process.once('SIGTERM', () => void shutdown())
-api.once('exit', (code) => {
-  if (code) void shutdown(code)
-})
+// API впав чи завершився — зупиняємо й Vite, щоб не працювати без бекенду
+api.once('exit', (code) => void shutdown(code ?? 1))
 
 try {
   if (isPreview) {

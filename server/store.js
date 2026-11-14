@@ -6,6 +6,7 @@
  *   ct:profile           string  Profile { goals, updatedAt }
  *   ct:foods             hash    id страви → Food («Мої страви»)
  *   ct:body              hash    дата → BodyRecord (вага й об'єми, один запис на день)
+ *   ct:game              string  GameState: монети, стрік, щити, видані нагороди, ачівки
  *   ct:off:<запит>       string  FoodItem[] — кеш пошуку Open Food Facts, TTL 1 доба
  *
  * Один hash на день: знімок дня читається одним HGETALL,
@@ -32,6 +33,7 @@ export const KEYS = {
   profile: 'ct:profile',
   foods: 'ct:foods',
   body: 'ct:body',
+  game: 'ct:game',
   /** @param {string} query нормалізований запит */
   offSearch: (query) => `ct:off:${query}`,
 }

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { ChevronRight, Minus, Plus, Ruler, Target, TrendingDown, TrendingUp } from 'lucide-react'
-import { useId, type KeyboardEvent, type MouseEvent } from 'react'
+import { useId } from 'react'
 import { BODY_LABELS, type BodyField } from '@shared/model.js'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { ProgressBar } from '@/components/ProgressBar'
@@ -23,17 +23,6 @@ export function BodyCard() {
   const weight = latestMeasure(records, 'weight')
   const start = startWeight(records)
   const spark = weightSeries(records).slice(-20)
-  const open = () => openModal({ type: 'body' })
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      open()
-    }
-  }
-  const setTarget = (e: MouseEvent) => {
-    e.stopPropagation()
-    openModal({ type: 'goals' })
-  }
 
   // Рух ваги «в правильний бік» — до цілі; без цілі тренд нейтральний.
   const towardTarget =
@@ -42,16 +31,16 @@ export function BodyCard() {
       : null
 
   return (
-    <motion.div
-      role="button"
-      tabIndex={0}
-      onClick={open}
-      onKeyDown={onKey}
-      whileTap={{ scale: 0.985 }}
-      aria-label="Мої параметри: відкрити графік і редагування"
-      className="card flex cursor-pointer flex-col gap-4 rounded-3xl p-5 text-left"
-    >
-      <header className="flex items-center gap-2">
+    <motion.div whileTap={{ scale: 0.985 }} className="card relative flex flex-col gap-4 rounded-3xl p-5 text-left">
+      {/* Уся картка — одна кнопка-підкладка; «Задати цільову вагу» лежить над нею окремою кнопкою
+          (кнопка всередині кнопки — невалідна розмітка й плутанина для скрінрідера) */}
+      <button
+        type="button"
+        onClick={() => openModal({ type: 'body' })}
+        aria-label="Мої параметри: відкрити графік і редагування"
+        className="absolute inset-0 rounded-3xl"
+      />
+      <header className="pointer-events-none flex items-center gap-2">
         <Ruler className="size-5 text-primary" strokeWidth={1.8} />
         <h2 className="flex-1 text-base font-bold">Мої параметри</h2>
         {weight && (
@@ -62,8 +51,10 @@ export function BodyCard() {
         <ChevronRight className="size-4 text-muted" />
       </header>
 
-      {!weight && loaded ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-line px-4 py-4 text-sm text-muted">
+      {!loaded ? (
+        <BodySkeleton />
+      ) : !weight ? (
+        <div className="pointer-events-none flex items-center gap-3 rounded-2xl border border-dashed border-line px-4 py-4 text-sm text-muted">
           <span className="flex size-10 items-center justify-center rounded-full bg-primary/15 text-primary">
             <Plus className="size-5" />
           </span>
@@ -71,14 +62,14 @@ export function BodyCard() {
         </div>
       ) : (
         <>
-          <div className="flex items-end gap-4">
+          <div className="pointer-events-none flex items-end gap-4">
             <div className="flex min-w-0 flex-col">
               <span className="text-xs text-muted">Вага</span>
               <span className="flex items-baseline gap-1">
-                <AnimatedNumber value={weight?.value ?? 0} format={kg} className="text-4xl leading-none font-bold" />
+                <AnimatedNumber value={weight.value} format={kg} className="text-4xl leading-none font-bold" />
                 <span className="text-sm text-muted">кг</span>
               </span>
-              {weight?.delta != null && (
+              {weight.delta != null && (
                 <span
                   className={cn(
                     'mt-2 flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold',
@@ -99,21 +90,19 @@ export function BodyCard() {
             <Sparkline values={spark.map((p) => p.value)} className="ml-auto h-16 flex-1" />
           </div>
 
-          {target !== null && weight && start !== null ? (
+          {target !== null && start !== null ? (
             <TargetProgress current={weight.value} start={start} target={target} />
           ) : (
-            weight && (
-              <button
-                type="button"
-                onClick={setTarget}
-                className="flex items-center gap-2 self-start text-xs font-medium text-primary"
-              >
-                <Target className="size-4" /> Задати цільову вагу
-              </button>
-            )
+            <button
+              type="button"
+              onClick={() => openModal({ type: 'goals' })}
+              className="relative -m-2 flex items-center gap-2 self-start p-2 text-xs font-medium text-primary"
+            >
+              <Target className="size-4" /> Задати цільову вагу
+            </button>
           )}
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="pointer-events-none grid grid-cols-3 gap-2">
             {MEASURES.map((f, i) => (
               <MeasureTile key={f} field={f} measure={latestMeasure(records, f)} index={i} />
             ))}
@@ -124,11 +113,31 @@ export function BodyCard() {
   )
 }
 
+/** Поки заміри вантажаться — силует картки замість «0,0 кг» */
+function BodySkeleton() {
+  return (
+    <div className="pointer-events-none flex animate-pulse flex-col gap-4" aria-hidden>
+      <div className="flex items-end gap-4">
+        <div className="flex flex-col gap-2">
+          <div className="h-3 w-10 rounded bg-white/[0.06]" />
+          <div className="h-9 w-28 rounded-lg bg-white/[0.06]" />
+        </div>
+        <div className="ml-auto h-16 flex-1 rounded-xl bg-white/[0.04]" />
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {MEASURES.map((f) => (
+          <div key={f} className="h-[68px] rounded-2xl bg-white/[0.04]" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function TargetProgress({ current, start, target }: { current: number; start: number; target: number }) {
   const left = Math.round(Math.abs(current - target) * 10) / 10
   const progress = targetProgress(start, current, target)
   return (
-    <div className="flex flex-col gap-2">
+    <div className="pointer-events-none flex flex-col gap-2">
       <div className="flex items-center justify-between text-xs">
         <span className="flex items-center gap-1.5 text-muted">
           <Target className="size-3.5" /> Ціль <b className="text-fg">{kg(target)} кг</b>

@@ -1,4 +1,26 @@
+import type { GameEvent, GameState } from '@shared/game.js'
 import type { BodyRecord, Entry, Food, FoodItem, Profile } from '@shared/model.js'
+
+export interface GameResult {
+  game: GameState
+  events: GameEvent[]
+}
+
+export type DevOp =
+  | 'addCoins'
+  | 'addShields'
+  | 'setStreak'
+  | 'setLastActive'
+  | 'clearToday'
+  | 'unlockAchievement'
+  | 'relockAchievement'
+  | 'reset'
+
+export type GameAction =
+  | { action: 'claim'; id: string }
+  | { action: 'seen'; id: string }
+  | { action: 'dismissNotice' }
+  | { action: 'dev'; op: DevOp; amount?: number; id?: string }
 
 /** Сервер відповів помилкою (4xx/5xx). */
 export class ApiError extends Error {
@@ -9,10 +31,6 @@ export class ApiError extends Error {
     this.status = status
   }
 
-  /** Повтор не допоможе: дані відхилено валідацією. */
-  get isPermanent(): boolean {
-    return this.status >= 400 && this.status < 500 && this.status !== 408 && this.status !== 429
-  }
 }
 
 /** До сервера не достукались (офлайн, таймаут). */
@@ -23,15 +41,28 @@ export class NetworkError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const timeout = AbortSignal.timeout(15_000)
-  const init: RequestInit = {
-    method,
-    cache: 'no-store',
-    signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
-  }
+/** Таймаут + скасування; AbortSignal.any є лише в нових браузерах (iOS 17.4+) — інакше лише сигнал скасування. */
+function requestSignal(signal?: AbortSignal): AbortSignal | undefined {
+  const timeout = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(15_000) : undefined
+  if (!signal) return timeout
+  if (!timeout) return signal
+  return typeof AbortSignal.any === 'function' ? AbortSignal.any([timeout, signal]) : signal
+}
+
+interface RequestOptions {
+  signal?: AbortSignal
+  /** 'default' — дозволити кеш браузера (пошук кешується сервером на годину) */
+  cache?: RequestCache
+}
+
+async function request<T>(method: string, path: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {
+  // Часовий пояс — серверу: «сьогодні» і ачівки за місцевим часом («Рання пташка», «Нічний дожор»).
+  const headers: Record<string, string> = { 'X-TZ-Offset': String(new Date().getTimezoneOffset()) }
+  const init: RequestInit = { method, cache: opts.cache ?? 'no-store', headers }
+  const signal = requestSignal(opts.signal)
+  if (signal) init.signal = signal
   if (body !== undefined) {
-    init.headers = { 'Content-Type': 'application/json' }
+    headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }
 
@@ -50,6 +81,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
         : `http_${res.status}`
     throw new ApiError(res.status, code)
   }
+  if (data === null) throw new ApiError(res.status, 'bad_json')
   return data as T
 }
 
@@ -58,8 +90,16 @@ const q = encodeURIComponent
 export const api = {
   getDay: (date: string) => request<{ entries: Entry[] }>('GET', `/api/day?date=${q(date)}`),
 
-  putEntry: (entry: Entry) =>
-    request<{ applied: boolean; entry: Entry }>('PUT', `/api/entries?id=${q(entry.id)}`, { entry }),
+  /**
+   * У відповіді — і стан гри з подіями (нагороди нараховує сервер при збереженні).
+   * source='copy' — запис створено кнопкою «Скопіювати з учора».
+   */
+  putEntry: (entry: Entry, source?: 'copy') =>
+    request<{ applied: boolean; entry: Entry; game?: GameResult }>(
+      'PUT',
+      `/api/entries?id=${q(entry.id)}${source ? `&source=${source}` : ''}`,
+      { entry },
+    ),
 
   deleteEntry: (id: string, date: string) =>
     request<{ ok: true }>('DELETE', `/api/entries?id=${q(id)}&date=${q(date)}`),
@@ -81,7 +121,14 @@ export const api = {
 
   deleteBody: (date: string) => request<{ ok: true }>('DELETE', `/api/body?date=${q(date)}`),
 
+  getGame: () => request<{ game: GameState }>('GET', '/api/game'),
+
+  gameAction: (body: GameAction) => request<GameResult>('POST', '/api/game', body),
+
   /** Пошук у Open Food Facts через наш сервер (фільтр energy-kcal_100g + кеш). */
   search: (query: string, signal?: AbortSignal) =>
-    request<{ results: FoodItem[] }>('GET', `/api/search?q=${q(query)}`, undefined, signal),
+    request<{ results: FoodItem[] }>('GET', `/api/search?q=${q(query)}`, undefined, {
+      ...(signal ? { signal } : {}),
+      cache: 'default',
+    }),
 }

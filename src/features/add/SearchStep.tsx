@@ -1,10 +1,12 @@
-import { LoaderCircle, PencilLine, RotateCcw, Search, X, Zap } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { ChevronRight, History, LoaderCircle, PencilLine, RotateCcw, Search, X, Zap } from 'lucide-react'
+import { useEffect, type ReactNode } from 'react'
 import { LIMITS, type FoodItem } from '@shared/model.js'
 import { Button } from '@/components/ui/Button'
 import { SheetFooter } from '@/components/ui/Modal'
 import { filterFoods, useOffSearch } from '@/data/search'
-import { useDataStore, useFoods } from '@/data/store'
+import { loadDay, useDataStore, useDay, useFoods } from '@/data/store'
+import { addDays } from '@/lib/date'
+import { useUiStore } from '@/store/ui'
 import { FoodRow } from './FoodRow'
 
 interface SearchStepProps {
@@ -13,15 +15,23 @@ interface SearchStepProps {
   onPick: (item: FoodItem) => void
   onManual: () => void
   onQuick: () => void
+  onYesterday: () => void
 }
 
-export function SearchStep({ query, onQuery, onPick, onManual, onQuick }: SearchStepProps) {
+export function SearchStep({ query, onQuery, onPick, onManual, onQuick, onYesterday }: SearchStepProps) {
   const foods = useFoods()
   const foodsLoaded = useDataStore((s) => s.foodsLoaded)
   const savedIds = new Set(foods.map((f) => f.id))
   const mine = filterFoods(foods, query).slice(0, 30)
   const off = useOffSearch(query)
   const searching = query.trim().length >= LIMITS.searchQuery.min
+  const yesterday = addDays(useUiStore((s) => s.selectedDate), -1)
+  const yesterdayDay = useDay(yesterday)
+  const yesterdayCount = yesterdayDay.entries.length
+  // підтягуємо вчорашній день заздалегідь — щоб показати, скільки там страв
+  useEffect(() => {
+    if (!yesterdayDay.loaded) void loadDay(yesterday)
+  }, [yesterdayDay.loaded, yesterday])
 
   return (
     <div className="flex flex-1 flex-col">
@@ -45,6 +55,26 @@ export function SearchStep({ query, onQuery, onPick, onManual, onQuick }: Search
           )}
         </label>
       </div>
+
+      {/* Швидкий шлях: повторити вчорашнє (ховаємо, коли щось шукають) */}
+      {!query && (
+        <button
+          type="button"
+          onClick={onYesterday}
+          className="mb-3 flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 px-3 py-2.5 text-left transition-colors active:bg-primary/20"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary">
+            <History className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">Скопіювати з учора</span>
+            <span className="block text-xs text-muted">
+              {yesterdayCount > 0 ? `Учора записано страв: ${yesterdayCount}` : 'Швидко повторити вчорашній раціон'}
+            </span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-primary" />
+        </button>
+      )}
 
       <Section title="Мої страви" count={foodsLoaded ? mine.length : undefined}>
         {mine.length > 0 ? (
@@ -84,10 +114,10 @@ export function SearchStep({ query, onQuery, onPick, onManual, onQuick }: Search
       )}
 
       <SheetFooter>
-        <Button variant="ghost" onClick={onManual} className="flex-1 px-3 whitespace-nowrap">
+        <Button variant="ghost" onClick={onManual} className="flex-1 px-3 text-sm whitespace-nowrap">
           <PencilLine className="size-4" /> Вручну
         </Button>
-        <Button variant="ghost" onClick={onQuick} className="flex-1 px-3 whitespace-nowrap">
+        <Button variant="ghost" onClick={onQuick} className="flex-1 px-3 text-sm whitespace-nowrap">
           <Zap className="size-4" /> Швидкий запис
         </Button>
       </SheetFooter>
