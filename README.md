@@ -1,32 +1,90 @@
-# React + TypeScript + Vite
+# 🔥 Calories Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Персональний трекер калорій (урізаний аналог Yazio). PWA для телефона й комп’ютера.
 
-Currently, two official plugins are available:
+Застосунок складається зі статичного фронтенду та Vercel Functions. Усі дані — записи щоденника й цілі — зберігаються в Upstash Redis. У браузері даних немає: зміни застосовуються в інтерфейсі одразу, а якщо сервер не відповів — відкочуються з повідомленням.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Увага: сайт відкритий для всіх
 
-## React Compiler
+Як і в recipe-book, автентифікації немає. Будь-хто, хто знає адресу, бачить і змінює дані.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Розгортання на Vercel
 
-## Expanding the Oxlint configuration
+1. Імпортуйте репозиторій у Vercel.
+2. **Storage → Upstash for Redis** → підключіть до проєкту. Vercel сам додасть `KV_REST_API_URL` і `KV_REST_API_TOKEN`.
+3. Deploy.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Локальна розробка
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+Потрібен Node.js 22+.
+
+```bash
+npm install
+npm run dev         # http://127.0.0.1:5173 — Vite + локальний API (порт 5174) з Redis у пам’яті
+npm run dev:vercel  # vercel dev зі справжнім Redis (потрібен vercel link і змінні середовища)
+npm run preview     # продакшн-збірка + локальний API
+npm run build       # перевірка типів + збірка в dist/
+npm test            # тести валідації та API
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Локальні дані зберігаються у `.data/dev-redis.json` і переживають перезапуск. Якщо база порожня, локальний сервер сам додає мокові дані: 15 страв у «Мої страви» і записи на сьогодні (вимкнути: `NO_SEED=1`). Щоб почати з нуля, видаліть цей файл.
+
+`npm run seed -- https://<app>.vercel.app` заливає ті самі мокові дані на задеплоєну версію (повторний запуск нічого не дублює).
+
+**Dev-панель** (кнопка DEV ліворуч унизу): перемикач шрифтів. У `npm run dev` вона видна завжди, а на Vercel — після відкриття `/?dev` (`/?dev=0` вимикає).
+
+## Структура
+
+```
+api/        Vercel Functions: day, entries, profile
+server/     HTTP-помічники та доступ до Redis (поза api/, щоб не стали функціями)
+shared/     модель, валідація, розрахунок БЖВ — спільне для сервера й клієнта (JS + JSDoc)
+src/        React-клієнт
+  data/       API-клієнт і Zustand-стор з оптимістичними змінами
+  features/   екрани та модалки
+  components/ UI-примітиви
+scripts/    локальний API-сервер, Redis у пам’яті
+tests/      node --test
+```
+
+Серверний код написаний на JS з JSDoc, а не на TS: Vercel запускає його без компіляції, а TypeScript 7 не має JS API, через який Vercel компілює `api/*.ts`. Типи все одно перевіряються в strict-режимі (`tsconfig.api.json`, `checkJs`).
+
+## Redis
+
+| Ключ | Тип | Вміст |
+|---|---|---|
+| `ct:day:<YYYY-MM-DD>` | hash | id запису → Entry |
+| `ct:profile` | string | `{ goals, targetWeight, updatedAt }` |
+| `ct:foods` | hash | id → Food («Мої страви») |
+| `ct:body` | hash | дата → вага й об’єми (груди, талія, стегна) |
+| `ct:off:<запит>` | string | кеш публічного пошуку, TTL 1 доба |
+
+## API
+
+| Метод і шлях | Що робить |
+|---|---|
+| `GET /api/day?date=…` | записи дня |
+| `PUT /api/entries?id=…` `{entry}` | створити або замінити запис (id генерує клієнт) |
+| `DELETE /api/entries?id=…&date=…` | видалити запис |
+| `GET` / `PUT /api/profile` `{profile}` | денні цілі й цільова вага |
+| `GET /api/body`, `PUT` / `DELETE /api/body?date=…` | заміри тіла (історія для графіка ваги) |
+| `GET /api/foods`, `PUT` / `DELETE /api/foods?id=…` | «Мої страви» |
+| `GET /api/search?q=…` | публічний пошук (Open Food Facts), лише продукти з `energy-kcal_100g` |
+
+Конфлікти між пристроями: перемагає версія з більшим `updatedAt`. Для записів «за вагою» сервер сам перераховує калорії й БЖВ з `per100` і `grams`.
+
+## Безкоштовні ліміти
+
+Застосунок розрахований на безкоштовні тарифи Vercel Hobby та Upstash Free:
+
+- фонового опитування немає: дані оновлюються при поверненні у вкладку (не частіше ніж раз на хвилину) і при зміні дня;
+- публічний пошук запускається лише через 350 мс після останнього символу, а результати кешуються на CDN Vercel і в Redis на добу;
+- фото продуктів завантажуються напряму з CDN Open Food Facts, тож трафік Vercel на них не витрачається;
+- Vercel Blob не використовується.
+
+Дані публічного пошуку — Open Food Facts (ODbL).
+
+## Теми
+
+Кольори задані CSS-змінними в `src/index.css` (`--bg-main`, `--bg-card`, `--accent-protein`, `--accent-fat`, `--accent-carbs` тощо). Щоб додати святкову тему, достатньо перевизначити ці змінні під `:root[data-theme='…']`.

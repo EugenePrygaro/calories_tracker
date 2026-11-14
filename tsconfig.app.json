@@ -16,9 +16,14 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* shared/ — JS з JSDoc, спільний з серверними функціями */
+    "allowJs": true,
+    "checkJs": true,
+
     /* Paths */
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["./shared/*"]
     },
 
     /* Strictness */
@@ -33,5 +38,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "shared"]
 }

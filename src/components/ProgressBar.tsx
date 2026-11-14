@@ -1,24 +1,44 @@
-import { motion } from 'framer-motion'
+import { motion, type MotionStyle } from 'framer-motion'
 import { cn } from '@/lib/cn'
 
 interface ProgressBarProps {
   value: number
   max: number
-  className?: string
+  /** Клас кольору заповнення, напр. `bg-protein`. При перевищенні max — градієнт перебору. */
   barClassName?: string
+  /** Клас доріжки, напр. підсвітка кольором макросу. */
+  trackClassName?: string
+  /** Затримка бліку (с), щоб сусідні бари не блищали одночасно. */
+  sheenDelay?: number
+  className?: string
 }
 
-export function ProgressBar({ value, max, className, barClassName }: ProgressBarProps) {
+/** Глянцевий прогрес-бар з бліком, що пробігає (див. `bar-gloss` в index.css). */
+export function ProgressBar({
+  value,
+  max,
+  barClassName = 'bg-accent-gradient',
+  trackClassName = 'bg-white/[0.06]',
+  sheenDelay = 0,
+  className,
+}: ProgressBarProps) {
   const pct = max > 0 ? Math.min(value / max, 1) * 100 : 0
-  const over = value > max
+  const over = max > 0 && value > max
 
   return (
-    <div className={cn('h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800', className)}>
+    <div
+      className={cn('track-inset h-2 w-full overflow-hidden rounded-full', trackClassName, className)}
+      role="progressbar"
+      aria-valuenow={Math.round(value)}
+      aria-valuemin={0}
+      aria-valuemax={Math.round(max)}
+    >
       <motion.div
-        className={cn('h-full rounded-full bg-brand-500', over && 'bg-red-500', barClassName)}
-        initial={false}
+        className={cn('bar-gloss h-full rounded-full', over ? 'bg-over' : barClassName)}
+        style={{ '--sheen-delay': `${sheenDelay}s` } as MotionStyle}
+        initial={{ width: 0 }}
         animate={{ width: `${pct}%` }}
-        transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+        transition={{ type: 'spring', stiffness: 110, damping: 20 }}
       />
     </div>
   )
