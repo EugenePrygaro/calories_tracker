@@ -12,8 +12,10 @@ import {
 } from '@shared/model.js'
 import { sanitizeBodyRecord, sanitizeEntry, sanitizeFood, sanitizeProfile } from '@shared/validate.js'
 import type { GameState } from '@shared/game.js'
+import type { ShopErrorCode, ShopItemId, UsableItemId } from '@shared/shop.js'
 import { toDateKey } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
+import type { AppTheme } from '@/lib/theme'
 import { useGameUi } from '@/store/gameUi'
 import { useUiStore } from '@/store/ui'
 import { ApiError, NetworkError, api, type GameAction, type GameResult } from './api'
@@ -99,8 +101,24 @@ async function guardedLoad<T>(fetch: () => Promise<T>, apply: (data: T) => void)
   }
 }
 
+/** Відмови магазину, які сервер повертає кодом (409). */
+const SHOP_ERRORS: Partial<Record<ShopErrorCode, string>> = {
+  not_enough_coins: 'Не вистачає калокоїнів',
+  inventory_full: 'Інвентар уже повний',
+  max_level: 'Уже максимальне розширення',
+  none_left: 'Цього товару немає в інвентарі',
+  already_active: 'Уже діє сьогодні',
+  kcal_done: 'Норму калорій сьогодні вже зараховано — квиток не потрібен',
+  nothing_to_restore: 'Немає обірваної серії, яку можна повернути',
+  already_owned: 'Цю тему вже куплено',
+  not_owned: 'Спершу купіть цю тему в магазині',
+}
+
 function errorMessage(err: unknown): string {
   if (err instanceof NetworkError) return 'Немає з’єднання з сервером. Зміну не збережено.'
+  if (err instanceof ApiError && err.status === 409 && err.message in SHOP_ERRORS) {
+    return SHOP_ERRORS[err.message as ShopErrorCode] as string
+  }
   if (err instanceof ApiError && err.status === 400) return 'Сервер відхилив дані. Перевірте значення.'
   return 'Не вдалося зберегти. Спробуйте ще раз.'
 }
@@ -391,6 +409,34 @@ export function dismissAchievement(id: string): void {
 export async function claimAchievementReward(id: string): Promise<void> {
   markAchievementSeen(id) // модалка зникає одразу, нагорода прилетить з відповіддю
   await gameAction({ action: 'claim', id })
+}
+
+/** Купити товар у магазині. Списання й нагороди показує стрічка подій. */
+export async function buyShopItem(item: ShopItemId): Promise<void> {
+  haptic(12)
+  await gameAction({ action: 'buy', item })
+}
+
+/** Використати товар з інвентарю (бустер, читміл, супер вогник). */
+export async function activateShopItem(item: UsableItemId): Promise<void> {
+  haptic([10, 40, 18])
+  await gameAction({ action: 'use', item })
+}
+
+/** Увімкнути тему (стандартну або куплену) — одразу локально, потім на сервері. */
+export async function chooseTheme(theme: AppTheme): Promise<void> {
+  const prev = useDataStore.getState().game
+  if (!prev || prev.activeTheme === theme) return
+  haptic(10)
+  useDataStore.setState({ game: { ...prev, activeTheme: theme } })
+  try {
+    await gameAction({ action: 'theme', theme })
+  } catch (err) {
+    // сервер відмовив — повертаємо попередню тему, якщо її ніхто не змінив
+    const now = useDataStore.getState().game
+    if (now?.activeTheme === theme) useDataStore.setState({ game: { ...now, activeTheme: prev.activeTheme } })
+    throw err
+  }
 }
 
 /** Закрити «серію врятовано» — одразу локально, потім на сервері. */

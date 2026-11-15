@@ -5,6 +5,7 @@ import { ACHIEVEMENTS } from '@shared/achievements.js'
 import type { DevOp } from '@/data/api'
 import { gameAction, useDataStore, useGame } from '@/data/store'
 import { GROUP_ORDER, GROUPS } from '@/features/game/achievementStyle'
+import { ALL_THEMES, THEME_LOOK } from '@/features/game/themeStyle'
 import { toDateKey } from '@/lib/date'
 import { useGameUi } from '@/store/gameUi'
 import { useUiStore } from '@/store/ui'
@@ -71,6 +72,8 @@ function GameDev() {
   const [achievementId, setAchievementId] = useState(ACHIEVEMENTS[0]?.id ?? '')
   const revealIcons = useGameUi((s) => s.revealIcons)
   const setRevealIcons = useGameUi((s) => s.setRevealIcons)
+  const themePreview = useGameUi((s) => s.themePreview)
+  const setThemePreview = useGameUi((s) => s.setThemePreview)
   const run = (op: DevOp, amount = 0, id?: string) => {
     setBusy(true)
     void gameAction({ action: 'dev', op, amount, ...(id ? { id } : {}) })
@@ -106,6 +109,23 @@ function GameDev() {
         <B onClick={() => run('setStreak', 6)} busy={busy}>Стрік = 6</B>
         <B onClick={() => run('setStreak', 29)} busy={busy}>Стрік = 29</B>
         <B onClick={() => run('setStreak', 0)} busy={busy}>Стрік = 0</B>
+      </Group>
+
+      <Group title="Тема (перегляд без покупки, лише тут)">
+        <select
+          value={themePreview ?? ''}
+          onChange={(e) => setThemePreview((e.target.value || null) as typeof themePreview)}
+          aria-label="Тема"
+          className="h-10 w-full rounded-lg bg-elevated px-2 text-base text-fg"
+        >
+          <option value="">Як у грі{game ? ` (${THEME_LOOK[game.activeTheme as keyof typeof THEME_LOOK]?.title ?? game.activeTheme})` : ''}</option>
+          {ALL_THEMES.map((t) => (
+            <option key={t} value={t}>
+              {THEME_LOOK[t].title}
+              {game && t !== 'default' && t in game.themes ? ' ✓' : ''}
+            </option>
+          ))}
+        </select>
       </Group>
 
       <Group title="Ачівки">

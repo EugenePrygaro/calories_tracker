@@ -2,6 +2,7 @@ import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
 import { CloudOff, Plus } from 'lucide-react'
 import { useEffect } from 'react'
 import { MEAL_TYPES } from '@shared/model.js'
+import { ThemeEffects } from '@/components/ThemeEffects'
 import { Toast } from '@/components/Toast'
 import { loadDay, useDay } from '@/data/store'
 import { BodyCard } from '@/features/body/BodyCard'
@@ -151,6 +152,7 @@ export default function App() {
       <RewardFeed />
       <AchievementUnlockModal />
       <DevPanel />
+      <ThemeEffects />
     </div>
   )
 }

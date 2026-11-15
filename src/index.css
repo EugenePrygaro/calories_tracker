@@ -1,14 +1,18 @@
 @import 'tailwindcss';
+@import './themes.css';
 
 /*
  * Токени теми «Смарагдовий графіт» — основа для всіх елементів.
- * Святкові теми (спринт 4) перевизначають лише ці змінні:
+ * Теми з магазину (src/themes.css) перевизначають лише ці змінні:
  *   :root[data-theme='newyear'] { --bg-main: …; --accent-primary: …; }
  * Компоненти використовують тільки класи нижче (bg-main, bg-card, card, text-protein…),
  * без «зашитих» кольорів.
  */
 :root {
   color-scheme: dark;
+
+  /* Шрифт: Play; естетичні стилі (themes.css) замінюють його */
+  --font-app: 'Play', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   /* Поверхні */
   --bg-main: #0c1210;
@@ -214,8 +218,8 @@ body:has([role='dialog']) :is(.bar-gloss, .sheen):not([role='dialog'] *)::after 
     min-height: 100dvh;
     background-color: var(--bg-main);
     color: var(--text-main);
-    /* Play — шрифт застосунку (@fontsource, див. main.tsx) */
-    font-family: 'Play', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    /* Шрифти — локально через @fontsource (див. main.tsx) */
+    font-family: var(--font-app);
     font-feature-settings: 'tnum';
     overscroll-behavior-y: none;
   }

@@ -9,6 +9,7 @@ export type Modal =
   | { type: 'goals' }
   | { type: 'body' }
   | { type: 'achievements' }
+  | { type: 'shop' }
 
 interface Toast {
   id: number

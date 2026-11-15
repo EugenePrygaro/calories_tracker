@@ -1,5 +1,6 @@
 import type { GameEvent, GameState } from '@shared/game.js'
 import type { BodyRecord, Entry, Food, FoodItem, Profile } from '@shared/model.js'
+import type { ShopItemId, ThemeId, UsableItemId } from '@shared/shop.js'
 
 export interface GameResult {
   game: GameState
@@ -20,6 +21,9 @@ export type GameAction =
   | { action: 'claim'; id: string }
   | { action: 'seen'; id: string }
   | { action: 'dismissNotice' }
+  | { action: 'buy'; item: ShopItemId }
+  | { action: 'use'; item: UsableItemId }
+  | { action: 'theme'; theme: ThemeId | 'default' }
   | { action: 'dev'; op: DevOp; amount?: number; id?: string }
 
 /** Сервер відповів помилкою (4xx/5xx). */
@@ -30,7 +34,6 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
   }
-
 }
 
 /** До сервера не достукались (офлайн, таймаут). */

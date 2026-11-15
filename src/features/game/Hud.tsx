@@ -3,8 +3,8 @@ import { Flame, Snowflake, Store, Trophy } from 'lucide-react'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { CoinIcon } from '@/components/CoinIcon'
 import { useGame } from '@/data/store'
+import { toDateKey } from '@/lib/date'
 import { int } from '@/lib/format'
-import { useGameUi } from '@/store/gameUi'
 import { useUiStore } from '@/store/ui'
 import { useClaimableCount } from './useClaimableCount'
 
@@ -16,15 +16,16 @@ export function Hud() {
   const coins = game?.coins ?? 0
   const streak = game?.streak ?? 0
   const shields = game?.shields ?? 0
+  const boosted = game?.boostDate === toDateKey()
 
   return (
     <div className="card flex items-center gap-2 rounded-2xl p-2">
-      {/* Гаманець — кнопка, що відкриватиме магазин */}
+      {/* Гаманець — відкриває магазин */}
       <motion.button
         type="button"
-        onClick={() => useGameUi.getState().info('Магазин скоро відкриється')}
+        onClick={() => openModal({ type: 'shop' })}
         whileTap={{ scale: 0.96 }}
-        aria-label={`Калокоїни: ${int(coins)}. Магазин`}
+        aria-label={`Калокоїни: ${int(coins)}${boosted ? ", бустер ×2" : ""}. Магазин`}
         // Рівна сірувата «таблетка» без відблиску зверху; лише блік, що пробігає (sheen)
         className="sheen flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full py-1 pr-1.5 pl-1 text-left ring-1 ring-inset ring-white/[0.08]"
         style={
@@ -48,7 +49,23 @@ export function Hud() {
         </span>
         <span className="relative flex min-w-0 flex-1 flex-col leading-tight">
           <span className="text-[10px] font-bold tracking-wider text-coin/80 uppercase">Калокоїни</span>
-          <AnimatedNumber value={coins} format={int} className="truncate text-lg font-bold" />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <AnimatedNumber value={coins} format={int} className="shrink-0 text-lg font-bold" />
+            {/* Активний «Бустер ×2» */}
+            <AnimatePresence>
+              {boosted && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [0, 1.3, 1] }}
+                  exit={{ scale: 0 }}
+                  title="Бустер ×2 діє сьогодні"
+                  className="flex shrink-0 items-center rounded-full bg-primary/20 px-1.5 text-[10px] leading-4 font-bold text-primary"
+                >
+                  ×2
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </span>
         </span>
         <span className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-coin/20 text-coin ring-[1.5px] ring-inset ring-coin/70">
           <Store className="size-4" />

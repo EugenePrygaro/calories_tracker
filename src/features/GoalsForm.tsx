@@ -7,6 +7,7 @@ import { NumberField } from '@/components/ui/Field'
 import { SheetFooter } from '@/components/ui/Modal'
 import { saveProfile, useDataStore, useGoals, useTargetWeight } from '@/data/store'
 import { kcal, parseNum } from '@/lib/format'
+import { ThemePicker } from './game/ThemePicker'
 
 type GoalsInput = Record<keyof Goals, string>
 
@@ -55,7 +56,10 @@ function GoalsFormInner({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={submit} className="flex flex-col gap-5">
+      {/* з'являється, щойно куплено хоч одну тему */}
+      <ThemePicker />
+
       <Group title="Харчування на день">
         <NumberField label="Калорії" suffix="ккал" value={f.kcal} onChange={set('kcal')} inputMode="numeric" />
         <div className="grid grid-cols-3 gap-3">

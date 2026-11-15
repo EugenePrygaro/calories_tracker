@@ -1,0 +1,306 @@
+/**
+ * Магазин: каталог товарів за калокоїни і чиста логіка покупки й використання.
+ * Сервер (api/game.js) застосовує її до стану гри, клієнт лише показує каталог і стан.
+ *
+ * Куплене лягає в інвентар (GameState.inventory, заморозки — у shields) і
+ * використовується окремою дією, коли треба. Розширення слотів діє одразу й назавжди.
+ * Теми купуються раз і назавжди (GameState.themes), активна — GameState.activeTheme.
+ */
+import { BASE_SHIELD_SLOTS, REWARDS, grant, localToday, newDayAwards, payStreakWeeks, trackHoldings } from './game.js'
+
+/** @typedef {import('./game.js').GameState} GameState */
+/** @typedef {import('./game.js').GameEvent} GameEvent */
+
+/** @typedef {'boosters' | 'holiday' | 'styles' | 'marketplace'} ShopCategory */
+/** Теми оформлення: святкові та естетичні стилі (кольори, ефекти, а в стилів — і шрифт). */
+/** @typedef {'newyear' | 'halloween' | 'spring' | 'valentine' | 'crimson' | 'synthwave'} ThemeId */
+/** @typedef {'shield' | 'cheatMeal' | 'boost' | 'superFlame' | 'shieldSlot' | 'temu' | ThemeId} ShopItemId */
+/** Товари, що лежать в інвентарі й використовуються окремою дією. */
+/** @typedef {'cheatMeal' | 'boost' | 'superFlame' | 'temu'} UsableItemId */
+/** @typedef {'unknown' | 'not_enough_coins' | 'inventory_full' | 'max_level' | 'none_left' | 'already_active' | 'kcal_done' | 'nothing_to_restore' | 'already_owned' | 'not_owned'} ShopErrorCode */
+
+/**
+ * @typedef {{
+ *   id: ShopItemId,
+ *   category: ShopCategory,
+ *   title: string,
+ *   desc: string,
+ *   icon: string,
+ * }} ShopItem
+ */
+
+/** @type {readonly { id: ShopCategory, title: string }[]} */
+export const SHOP_CATEGORIES = [
+  { id: 'boosters', title: 'Бустери' },
+  { id: 'holiday', title: 'Святкові теми' },
+  { id: 'styles', title: 'Естетичні стилі' },
+  { id: 'marketplace', title: 'Маркетплейс' },
+]
+
+/** @type {readonly ThemeId[]} */
+export const THEME_IDS = ['newyear', 'halloween', 'spring', 'valentine', 'crimson', 'synthwave']
+/** Тема за замовчуванням («Смарагдовий графіт») — безкоштовна й завжди доступна. */
+export const DEFAULT_THEME = 'default'
+
+/** @type {readonly ShopItem[]} */
+export const SHOP_ITEMS = [
+  {
+    id: 'shield',
+    category: 'boosters',
+    title: 'Заморозка',
+    desc: 'Автоматично зберігає серію днів, якщо пропустив запис їжі.',
+    icon: 'Snowflake',
+  },
+  {
+    id: 'cheatMeal',
+    category: 'boosters',
+    title: 'Читміл-квиток',
+    desc: 'Разовий жетон на свято: можна перевищити денну норму калорій, а день усе одно зарахується як успішний — для нагороди, статистики й ачівок.',
+    icon: 'Ticket',
+  },
+  {
+    id: 'boost',
+    category: 'boosters',
+    title: 'Бустер ×2',
+    desc: 'Подвоює всі калокоїни за прийоми їжі та закриття норм до кінця поточної доби.',
+    icon: 'Zap',
+  },
+  {
+    id: 'superFlame',
+    category: 'boosters',
+    title: 'Супер вогник',
+    desc: 'Повертає втрачену серію, якщо заморозки не вистачило, — скільки б днів не пропустив. В інвентарі — не більше одного.',
+    icon: 'FlameKindling',
+  },
+  {
+    id: 'shieldSlot',
+    category: 'boosters',
+    title: 'Розширення інвентарю',
+    desc: 'Назавжди збільшує запас заморозок серії: з 2 до 3, а потім до 4.',
+    icon: 'PackagePlus',
+  },
+  {
+    id: 'newyear',
+    category: 'holiday',
+    title: 'Новорічна',
+    desc: 'Хвойні відтінки, золоті рамки й сніг, що падає на фоні.',
+    icon: 'TreePine',
+  },
+  {
+    id: 'halloween',
+    category: 'holiday',
+    title: 'Геловінська',
+    desc: 'Гарбузовий неон на глибокому фіолетовому.',
+    icon: 'Ghost',
+  },
+  {
+    id: 'spring',
+    category: 'holiday',
+    title: 'Весняна',
+    desc: 'Теплі пастельні акценти й пелюстки, що кружляють на фоні.',
+    icon: 'Flower2',
+  },
+  {
+    id: 'valentine',
+    category: 'holiday',
+    title: 'День закоханих',
+    desc: 'Рожево-червона гама й сердечка, що здіймаються на фоні.',
+    icon: 'Heart',
+  },
+  {
+    id: 'crimson',
+    category: 'styles',
+    title: 'Багряна класика',
+    desc: 'Насичений червоний на глибокому темному, тонкі золоті лінії й м’яка віньєтка.',
+    icon: 'Gem',
+  },
+  {
+    id: 'synthwave',
+    category: 'styles',
+    title: 'Synthwave / 8-біт',
+    desc: 'Неоновий рожевий і бірюзовий, футуристичний шрифт, сітка-горизонт і ефект старого екрана.',
+    icon: 'Gamepad2',
+  },
+  {
+    id: 'temu',
+    category: 'marketplace',
+    title: 'Фігня з Temu',
+    desc: 'Вкрай необхідна річ. Потрібніша за заморозки й навіть за врятування серії. У трекері не робить абсолютно нічого — використаєш, і вона зникне.',
+    icon: 'Package',
+  },
+]
+
+/**
+ * Ціни в калокоїнах. Орієнтир — до 60 за день ідеальної гри (+100 за тиждень серії):
+ * заморозка ≈ 2,5 дня, читміл ≈ 3 дні, супер вогник ≈ 6 днів;
+ * бустер дешевий — за день він дає максимум +60 зверху.
+ */
+export const PRICES = {
+  shield: 150,
+  cheatMeal: 180,
+  boost: 30,
+  superFlame: 350,
+  /** ≈ тиждень серії: 7 × 60 + 100 за тиждень */
+  temu: 520,
+}
+/** Ціна кожного наступного слота заморозки: 3-й, 4-й. */
+export const SLOT_PRICES = [400, 800]
+export const MAX_SHIELD_SLOTS = BASE_SHIELD_SLOTS + SLOT_PRICES.length
+/** Тема — «середня» покупка: приблизно 10 днів серії (10 × 60 + тижневий бонус ≈ 700). */
+export const THEME_PRICE = 600
+/** Скільки однакових товарів можна тримати в інвентарі. */
+export const MAX_STACK = 9
+
+export class ShopError extends Error {
+  /** @param {ShopErrorCode} code */
+  constructor(code) {
+    super(code)
+    this.code = code
+  }
+}
+
+/** @param {unknown} id @returns {id is ShopItemId} */
+export const isShopItemId = (id) => typeof id === 'string' && SHOP_ITEMS.some((x) => x.id === id)
+/** @param {unknown} id @returns {id is UsableItemId} */
+export const isUsableItemId = (id) => id === 'cheatMeal' || id === 'boost' || id === 'superFlame' || id === 'temu'
+/** @param {unknown} id @returns {id is ThemeId} */
+export const isThemeId = (id) => typeof id === 'string' && /** @type {readonly string[]} */ (THEME_IDS).includes(id)
+
+/**
+ * Ціна товару зараз; null — купити вже неможливо (досягнуто максимуму).
+ * @param {ShopItemId} id @param {GameState} state @returns {number | null}
+ */
+export function priceOf(id, state) {
+  if (id === 'shieldSlot') return SLOT_PRICES[state.shieldSlots - BASE_SHIELD_SLOTS] ?? null
+  if (isThemeId(id)) return THEME_PRICE
+  return PRICES[id]
+}
+
+/** Скільки цього товару є. @param {ShopItemId} id @param {GameState} state */
+export function ownedOf(id, state) {
+  if (id === 'shield') return state.shields
+  if (id === 'shieldSlot') return state.shieldSlots
+  if (isThemeId(id)) return id in state.themes ? 1 : 0
+  return state.inventory[id]
+}
+
+/** Ліміт: заморозки — за слотами, розширення — максимум слотів, супер вогник — 1, інше — MAX_STACK. @param {ShopItemId} id @param {GameState} state */
+export function capOf(id, state) {
+  if (id === 'shield') return state.shieldSlots
+  if (id === 'shieldSlot') return MAX_SHIELD_SLOTS
+  if (isThemeId(id) || id === 'superFlame') return 1
+  return MAX_STACK
+}
+
+/**
+ * Чому товар зараз не можна купити (null — можна). Спільне для сервера й кнопки в магазині.
+ * @param {ShopItemId} id @param {GameState} state @returns {ShopErrorCode | null}
+ */
+export function buyBlocker(id, state) {
+  if (isThemeId(id) && id in state.themes) return 'already_owned'
+  const price = priceOf(id, state)
+  if (price === null) return 'max_level'
+  if (ownedOf(id, state) >= capOf(id, state)) return 'inventory_full'
+  if (state.coins < price) return 'not_enough_coins'
+  return null
+}
+
+/**
+ * Чому товар зараз не можна використати (null — можна).
+ * @param {UsableItemId} id @param {GameState} state @param {string} today місцева дата YYYY-MM-DD
+ * @returns {ShopErrorCode | null}
+ */
+export function consumeBlocker(id, state, today) {
+  if (state.inventory[id] <= 0) return 'none_left'
+  if (id === 'boost') return state.boostDate === today ? 'already_active' : null
+  if (id === 'cheatMeal') {
+    const day = state.days[today]
+    if (day?.cheat) return 'already_active'
+    if (day?.kcal) return 'kcal_done' // день уже успішний — квиток нічого не дасть
+    return null
+  }
+  if (id === 'temu') return null
+  // супер вогник: повертає обірвану серію коли завгодно — скільки б днів не минуло
+  return state.lostStreak ? null : 'nothing_to_restore'
+}
+
+/**
+ * Купити товар.
+ * @param {GameState} state @param {unknown} id @param {number} [now]
+ * @returns {GameEvent[]}
+ */
+export function buyItem(state, id, now = Date.now()) {
+  if (!isShopItemId(id)) throw new ShopError('unknown')
+  const blocker = buyBlocker(id, state)
+  if (blocker) throw new ShopError(blocker)
+  const item = /** @type {ShopItem} */ (SHOP_ITEMS.find((x) => x.id === id))
+
+  /** @type {GameEvent[]} */
+  const events = []
+  grant(state, -(/** @type {number} */ (priceOf(id, state))), 'shop', item.title, events)
+  if (id === 'shield') state.shields++
+  else if (id === 'shieldSlot') state.shieldSlots++
+  else if (isThemeId(id)) {
+    // нову тему одразу вмикаємо — це те, заради чого її купили
+    state.themes[id] = now
+    state.activeTheme = id
+    events.push({ type: 'notice', label: `Тему «${item.title}» увімкнено` })
+  } else state.inventory[id]++
+  state.counters.shopPurchases++
+  trackHoldings(state)
+  state.updatedAt = now
+  return events
+}
+
+/**
+ * Використати товар з інвентарю.
+ * @param {GameState} state @param {unknown} id @param {number} [now] @param {number} [tzOffset]
+ * @returns {GameEvent[]}
+ */
+export function consumeItem(state, id, now = Date.now(), tzOffset = 0) {
+  if (!isUsableItemId(id)) throw new ShopError('unknown')
+  const today = localToday(now, tzOffset)
+  const blocker = consumeBlocker(id, state, today)
+  if (blocker) throw new ShopError(blocker)
+
+  /** @type {GameEvent[]} */
+  const events = []
+  state.inventory[id]--
+
+  if (id === 'boost') {
+    state.boostDate = today
+    events.push({ type: 'notice', label: 'Бустер ×2 діє до кінця дня' })
+  } else if (id === 'cheatMeal') {
+    // День одразу зараховується як успішний: прапорець калоражу стоїть,
+    // тож перебір норми вже нічого не забере
+    const day = (state.days[today] ??= newDayAwards())
+    day.cheat = true
+    day.kcal = true
+    const coins = state.boostDate === today ? REWARDS.kcal * 2 : REWARDS.kcal
+    grant(state, coins, 'kcal', 'Читміл: день зараховано', events)
+  } else if (id === 'temu') {
+    events.push({ type: 'notice', label: 'Розпаковано… і вже зламалося' })
+  } else {
+    // Повертаємо обірвану серію: дні після обриву йдуть поспіль, тож просто додаємо
+    const lost = /** @type {import('./game.js').LostStreak} */ (state.lostStreak)
+    state.streak += lost.value
+    state.streakWeeksPaid = Math.max(state.streakWeeksPaid, lost.weeksPaid)
+    state.bestStreak = Math.max(state.bestStreak, state.streak)
+    state.lostStreak = null
+    events.push({ type: 'notice', label: 'Серію повернуто' }, { type: 'streak', streak: state.streak })
+    payStreakWeeks(state, events)
+  }
+  state.updatedAt = now
+  return events
+}
+
+/**
+ * Увімкнути тему: стандартну або куплену.
+ * @param {GameState} state @param {unknown} id @param {number} [now]
+ */
+export function setTheme(state, id, now = Date.now()) {
+  if (id !== DEFAULT_THEME && !isThemeId(id)) throw new ShopError('unknown')
+  if (isThemeId(id) && !(id in state.themes)) throw new ShopError('not_owned')
+  state.activeTheme = /** @type {ThemeId | 'default'} */ (id)
+  state.updatedAt = now
+}

@@ -7,9 +7,18 @@ import '@fontsource/play/cyrillic-400.css'
 import '@fontsource/play/latin-400.css'
 import '@fontsource/play/cyrillic-700.css'
 import '@fontsource/play/latin-700.css'
+// Шрифт стилю Synthwave (themes.css); браузер завантажить його, лише коли стиль увімкнено
+import '@fontsource/exo-2/cyrillic-400.css'
+import '@fontsource/exo-2/latin-400.css'
+import '@fontsource/exo-2/cyrillic-700.css'
+import '@fontsource/exo-2/latin-700.css'
 import './index.css'
 import App from './App.tsx'
 import { startAutoRefresh } from './data/store'
+import { applyTheme, readCachedTheme } from './lib/theme'
+
+// Тема — до першого рендеру, щоб не блимала стандартна
+applyTheme(readCachedTheme())
 
 // Нова версія застосунку: оновлюємось, коли вкладку сховали, — не перериваємо введення
 let updateReady = false

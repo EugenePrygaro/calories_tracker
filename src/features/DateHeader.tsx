@@ -74,7 +74,7 @@ function DateNav() {
 
       <motion.button
         type="button"
-        aria-label="Денні цілі"
+        aria-label="Налаштування"
         title="Денні цілі"
         onClick={() => openModal({ type: 'goals' })}
         whileTap={{ scale: 0.9, rotate: 45 }}

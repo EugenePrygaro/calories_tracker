@@ -36,6 +36,7 @@ import { MEAL_LABELS, MEAL_TYPES } from './model.js'
  *   kcalCounted: number,
  *   edits: number,
  *   copies: number,
+ *   cheat: boolean,
  * }} DayAwards
  */
 
@@ -91,6 +92,17 @@ export const COUNTER_KEYS = [
  */
 
 /**
+ * Куплені й ще не використані товари магазину (див. shared/shop.js).
+ * Заморозки лежать окремо — у GameState.shields.
+ * @typedef {{ cheatMeal: number, boost: number, superFlame: number, temu: number }} Inventory
+ */
+
+/**
+ * Серія, яку щойно обірвало, — її може повернути «Супер вогник».
+ * @typedef {{ value: number, weeksPaid: number, date: string }} LostStreak
+ */
+
+/**
  * @typedef {{
  *   coins: number,
  *   streak: number,
@@ -99,6 +111,12 @@ export const COUNTER_KEYS = [
  *   lastSundayDate: string | null,
  *   streakWeeksPaid: number,
  *   shields: number,
+ *   shieldSlots: number,
+ *   inventory: Inventory,
+ *   boostDate: string | null,
+ *   lostStreak: LostStreak | null,
+ *   themes: Record<string, number>,
+ *   activeTheme: string,
  *   proteinStreak: number,
  *   bestProteinStreak: number,
  *   lastProteinDate: string | null,
@@ -113,7 +131,7 @@ export const COUNTER_KEYS = [
  * }} GameState
  */
 
-/** @typedef {'meal' | 'protein' | 'kcal' | 'streakWeek' | 'achievement' | 'dev'} RewardReason */
+/** @typedef {'meal' | 'protein' | 'kcal' | 'streakWeek' | 'achievement' | 'shop' | 'dev'} RewardReason */
 
 /**
  * Що сталося внаслідок дії — клієнт показує це анімаціями.
@@ -122,6 +140,7 @@ export const COUNTER_KEYS = [
  *   | { type: 'streak', streak: number }
  *   | { type: 'rescue', missed: number, usedShields: number, streak: number }
  *   | { type: 'streakReset' }
+ *   | { type: 'notice', label: string }
  * )} GameEvent
  */
 
@@ -159,6 +178,8 @@ export const MAX_EDITS_COUNTED_PER_DAY = 3
 const DAILY_KCAL_CAP = 5000
 /** «День бабака»: скільки натискань «Скопіювати з учора» зараховується за день. */
 export const MAX_COPIES_COUNTED_PER_DAY = 5
+/** Скільки заморозок вміщає інвентар без розширень (див. shared/shop.js). */
+export const BASE_SHIELD_SLOTS = 2
 /** Скільки днів історії нагород тримати (нагороди лише за «сьогодні ± 1»). */
 const KEEP_DAYS = 7
 
@@ -184,6 +205,7 @@ export function newDayAwards() {
     kcalCounted: 0,
     edits: 0,
     copies: 0,
+    cheat: false,
   }
 }
 
@@ -197,6 +219,12 @@ export function newGameState() {
     lastSundayDate: null,
     streakWeeksPaid: 0,
     shields: 0,
+    shieldSlots: BASE_SHIELD_SLOTS,
+    inventory: { cheatMeal: 0, boost: 0, superFlame: 0, temu: 0 },
+    boostDate: null,
+    lostStreak: null,
+    themes: {},
+    activeTheme: 'default',
     proteinStreak: 0,
     bestProteinStreak: 0,
     lastProteinDate: null,
@@ -296,6 +324,8 @@ export function registerActivity(state, date, events) {
       state.notice = { date, missed, usedShields: shieldsNeeded, streak: state.streak }
       events.push({ type: 'rescue', missed, usedShields: shieldsNeeded, streak: state.streak })
     } else {
+      // запам'ятовуємо обірвану серію — її ще можна повернути «Супер вогником»
+      state.lostStreak = { value: state.streak, weeksPaid: state.streakWeeksPaid, date }
       state.streak = 1
       state.streakWeeksPaid = 0
       // «Незламний»: повернувся й записав їжу після скидання серії
@@ -315,8 +345,14 @@ export function registerActivity(state, date, events) {
   state.lastActiveDate = date
   state.bestStreak = Math.max(state.bestStreak, state.streak)
   events.push({ type: 'streak', streak: state.streak })
+  payStreakWeeks(state, events)
+}
 
-  // +100 монет за кожні 7 днів безперервної серії
+/**
+ * +100 калокоїнів за кожні 7 днів безперервної серії (кожен тиждень — один раз).
+ * @param {GameState} state @param {GameEvent[]} events
+ */
+export function payStreakWeeks(state, events) {
   const weeks = Math.floor(state.streak / 7)
   while (state.streakWeeksPaid < weeks) {
     state.streakWeeksPaid++
@@ -354,16 +390,21 @@ export function applyDayProgress(state, ctx, events) {
     state.entriesLogged++
   }
 
+  // «Бустер ×2» подвоює нагороди за прийоми їжі й норми лише за день, на який його активовано
+  const boosted = state.boostDate === ctx.date
+  const x = (/** @type {number} */ coins) => (boosted ? coins * 2 : coins)
+  const tag = boosted ? ' ×2' : ''
+
   for (const meal of MEAL_TYPES) {
     if (ctx.meals.has(meal) && !day.meals.includes(meal)) {
       day.meals.push(meal)
-      grant(state, REWARDS.meal, 'meal', MEAL_LABELS[meal], events)
+      grant(state, x(REWARDS.meal), 'meal', MEAL_LABELS[meal] + tag, events)
     }
   }
 
   if (!day.protein && withinGoal(totals.protein, goals.protein, PROTEIN_TOLERANCE)) {
     day.protein = true
-    grant(state, REWARDS.protein, 'protein', 'Норма білка', events)
+    grant(state, x(REWARDS.protein), 'protein', 'Норма білка' + tag, events)
     // серія днів у нормі білка (для ачівок)
     const prev = state.lastProteinDate
     if (prev && ctx.date < prev) {
@@ -378,7 +419,7 @@ export function applyDayProgress(state, ctx, events) {
 
   if (!day.kcal && withinGoal(totals.kcal, goals.kcal, KCAL_TOLERANCE)) {
     day.kcal = true
-    grant(state, REWARDS.kcal, 'kcal', 'Денна норма калорій', events)
+    grant(state, x(REWARDS.kcal), 'kcal', 'Денна норма калорій' + tag, events)
   }
 
   // ── Лічильники для ачівок (кожен — не більше разу на день) ──

@@ -3,8 +3,9 @@
  */
 import { DATE_RE, DEFAULT_GOALS, MEAL_TYPES } from '../shared/model.js'
 import { sum } from '../shared/nutrition.js'
-import { COUNTER_KEYS, dayDiff, grant, isNearToday, localToday, newDayAwards, newGameState, onEntrySaved, trackHoldings } from '../shared/game.js'
+import { BASE_SHIELD_SLOTS, COUNTER_KEYS, dayDiff, grant, isNearToday, localToday, newDayAwards, newGameState, onEntrySaved, trackHoldings } from '../shared/game.js'
 import { ID_ALIASES, isAchievementId } from '../shared/achievements.js'
+import { DEFAULT_THEME, MAX_SHIELD_SLOTS, isThemeId } from '../shared/shop.js'
 import { obj, sanitizeEntry, sanitizeProfile } from '../shared/validate.js'
 import { HttpError } from './http.js'
 import { KEYS, parseStored } from './store.js'
@@ -35,6 +36,20 @@ export function sanitizeGame(input) {
   s.lastSundayDate = dateOrNull(o.lastSundayDate)
   s.streakWeeksPaid = count(o.streakWeeksPaid, 100_000)
   s.shields = count(o.shields, 1000)
+  s.shieldSlots = Math.min(Math.max(count(o.shieldSlots, 100), BASE_SHIELD_SLOTS), MAX_SHIELD_SLOTS)
+  const inv = obj(o.inventory)
+  s.inventory = {
+    cheatMeal: count(inv.cheatMeal, 1000),
+    boost: count(inv.boost, 1000),
+    superFlame: count(inv.superFlame, 1),
+    temu: count(inv.temu, 1000),
+  }
+  s.boostDate = dateOrNull(o.boostDate)
+  const lost = obj(o.lostStreak)
+  const lostDate = dateOrNull(lost.date)
+  for (const [id, at] of Object.entries(obj(o.themes))) if (isThemeId(id)) s.themes[id] = count(at)
+  s.activeTheme = isThemeId(o.activeTheme) && o.activeTheme in s.themes ? o.activeTheme : DEFAULT_THEME
+  s.lostStreak = lostDate ? { value: count(lost.value, 100_000), weeksPaid: count(lost.weeksPaid, 100_000), date: lostDate } : null
   s.proteinStreak = count(o.proteinStreak, 100_000)
   s.bestProteinStreak = Math.max(count(o.bestProteinStreak, 100_000), s.proteinStreak)
   s.lastProteinDate = dateOrNull(o.lastProteinDate)
@@ -49,7 +64,7 @@ export function sanitizeGame(input) {
     const d = obj(raw)
     const day = newDayAwards()
     day.meals = (Array.isArray(d.meals) ? d.meals : []).filter(/** @returns {m is MealType} */ (m) => MEAL_TYPES.includes(m))
-    for (const flag of /** @type {const} */ (['protein', 'kcal', 'full', 'exact', 'perfect', 'carbs', 'fat', 'early', 'late'])) {
+    for (const flag of /** @type {const} */ (['protein', 'kcal', 'full', 'exact', 'perfect', 'carbs', 'fat', 'early', 'late', 'cheat'])) {
       day[flag] = d[flag] === true
     }
     day.entries = count(d.entries, 1000)
@@ -151,7 +166,6 @@ export async function processEntrySaved(r, entry, existing, opts, now = Date.now
 export function devToolsEnabled() {
   return process.env.DISABLE_DEV_TOOLS !== '1'
 }
-
 
 /**
  * @param {GameState} state @param {string} op @param {number} amount @param {number} [now]

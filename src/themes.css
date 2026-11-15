@@ -1,0 +1,311 @@
+/*
+ * Теми оформлення з магазину. Кожна перевизначає токени з index.css,
+ * естетичні стилі — ще й шрифт (--font-app). Тему вмикає атрибут
+ * <html data-theme="…"> (src/lib/theme.ts), фонові ефекти малює ThemeEffects.
+ */
+
+/* ── Новорічна: хвоя, золоті рамки, сніг ── */
+:root[data-theme='newyear'] {
+  --bg-main: #07130e;
+  --bg-glow: #1e3d2d;
+  --bg-card: #0e1e17;
+  --bg-elevated: #15302a;
+  --border: rgb(226 186 92 / 0.3);
+  --glass-from: rgb(255 240 200 / 0.06);
+  --glass-to: rgb(255 255 255 / 0.015);
+  --glass-highlight: rgb(240 200 110 / 0.22);
+  --text-muted: #93a99c;
+  --accent-primary: #2fae6b;
+  --accent-primary-deep: #0b5632;
+  --accent-secondary: #e8c96d;
+  --coin: #f2cb5a;
+}
+
+/* ── Геловінська: гарбузовий неон на фіолетовому ── */
+:root[data-theme='halloween'] {
+  --bg-main: #0e0913;
+  --bg-glow: #3b1b4d;
+  --bg-card: #19101f;
+  --bg-elevated: #24172e;
+  --border: rgb(255 140 40 / 0.2);
+  --glass-highlight: rgb(255 150 60 / 0.14);
+  --text-main: #f2e8f5;
+  --text-muted: #a596ae;
+  --accent-primary: #ff8a1f;
+  --accent-primary-deep: #a83b06;
+  --accent-secondary: #bb86ff;
+  --streak: #ff6a1f;
+}
+
+/* ── Весняна: теплі пастельні акценти ── */
+:root[data-theme='spring'] {
+  --bg-main: #16121a;
+  --bg-glow: #40303d;
+  --bg-card: #1f1922;
+  --bg-elevated: #2a2230;
+  --border: rgb(255 220 235 / 0.11);
+  --glass-from: rgb(255 230 240 / 0.07);
+  --glass-highlight: rgb(255 220 235 / 0.1);
+  --text-main: #f6ecf0;
+  --text-muted: #ab9ca8;
+  --accent-primary: #f19abf;
+  --accent-primary-deep: #a8527c;
+  --accent-secondary: #a9e5cd;
+  --accent-protein: #8ec5f2;
+  --accent-fat: #f5d78e;
+  --accent-carbs: #f2a08f;
+  --streak: #ffb38a;
+  --coin: #f6d58c;
+}
+
+/* ── День закоханих: рожево-червона гама ── */
+:root[data-theme='valentine'] {
+  --bg-main: #15090f;
+  --bg-glow: #4c1428;
+  --bg-card: #210f19;
+  --bg-elevated: #2d1522;
+  --border: rgb(255 120 160 / 0.17);
+  --glass-highlight: rgb(255 150 180 / 0.13);
+  --text-main: #fbe9ef;
+  --text-muted: #b298a4;
+  --accent-primary: #ff4f80;
+  --accent-primary-deep: #9e1240;
+  --accent-secondary: #ffb4c9;
+  --streak: #ff7a59;
+}
+
+/* ── Багряна класика: насичений червоний, золото (шрифт — стандартний Play) ── */
+:root[data-theme='crimson'] {
+  --bg-main: #0c0506;
+  --bg-glow: #3d0b13;
+  --bg-card: #170a0c;
+  --bg-elevated: #221012;
+  --border: rgb(212 175 105 / 0.24);
+  --glass-from: rgb(212 175 105 / 0.06);
+  --glass-to: rgb(255 255 255 / 0.01);
+  --glass-highlight: rgb(212 175 105 / 0.22);
+  --text-main: #f3e7e1;
+  --text-muted: #a9928b;
+  --accent-primary: #d21e3d;
+  --accent-primary-deep: #690617;
+  --accent-secondary: #d6b06a;
+  --coin: #d6b06a;
+  --streak: #e0653f;
+}
+
+
+/* ── Synthwave / 8-біт: неон, футуристичний шрифт Exo 2, сітка, scanlines ── */
+:root[data-theme='synthwave'] {
+  --font-app: 'Exo 2', 'Play', system-ui, sans-serif;
+  --bg-main: #0b0618;
+  --bg-glow: #40105e;
+  --bg-card: #140b26;
+  --bg-elevated: #1e1136;
+  --border: rgb(0 229 255 / 0.24);
+  --glass-from: rgb(255 47 179 / 0.07);
+  --glass-to: rgb(0 229 255 / 0.02);
+  --glass-highlight: rgb(255 47 179 / 0.22);
+  --text-main: #f4eaff;
+  --text-muted: #a594c6;
+  --accent-primary: #ff2fb3;
+  --accent-primary-deep: #6f16c4;
+  --accent-secondary: #00e5ff;
+  --streak: #ff7a3d;
+  --coin: #ffd84a;
+}
+
+/* 8-біт: картки з «гострішими» кутами */
+:root[data-theme='synthwave'] .card {
+  border-radius: 10px;
+}
+
+/* Неонове світіння акцентного тексту */
+:root:is([data-theme='synthwave'], [data-theme='halloween']) :is(.text-primary, .text-secondary) {
+  text-shadow: 0 0 10px color-mix(in oklab, currentColor 70%, transparent);
+}
+
+/* ─── Фонові ефекти (ThemeEffects) ─────────────────────────────────────────── */
+
+/*
+ * Шар позаду всього вмісту. Частинки — це повторюваний фон-«плитка», а рух —
+ * лише transform на одну плитку (композитор, без перемальовування кожного кадру).
+ */
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fx-fall,
+.fx-rise {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1 * var(--tile));
+  height: calc(100% + 2 * var(--tile));
+  background-size: var(--tile) var(--tile);
+  will-change: transform;
+  animation: var(--dur) linear infinite;
+}
+.fx-fall {
+  animation-name: fx-fall;
+}
+.fx-rise {
+  animation-name: fx-rise;
+}
+
+@keyframes fx-fall {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--tile));
+  }
+}
+@keyframes fx-rise {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-1 * var(--tile)));
+  }
+}
+
+/* Сніг: дві плитки з різним розміром, швидкістю й яскравістю — ефект глибини */
+.fx-snow-a {
+  --tile: 150px;
+  --dur: 10s;
+  background-image:
+    radial-gradient(3px 3px at 20px 30px, rgb(255 255 255 / 0.95), transparent),
+    radial-gradient(2.5px 2.5px at 95px 105px, rgb(255 255 255 / 0.85), transparent),
+    radial-gradient(3.5px 3.5px at 130px 50px, rgb(255 255 255 / 0.9), transparent),
+    radial-gradient(2px 2px at 55px 130px, rgb(255 255 255 / 0.8), transparent),
+    radial-gradient(2.5px 2.5px at 75px 70px, rgb(255 255 255 / 0.7), transparent);
+}
+.fx-snow-b {
+  --tile: 220px;
+  --dur: 20s;
+  opacity: 0.7;
+  background-image:
+    radial-gradient(1.5px 1.5px at 40px 70px, rgb(255 255 255 / 0.9), transparent),
+    radial-gradient(1px 1px at 200px 30px, rgb(255 255 255 / 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 130px 200px, rgb(255 255 255 / 0.9), transparent);
+}
+
+/* Пелюстки: пастельні овали */
+.fx-petals-a {
+  --tile: 220px;
+  --dur: 16s;
+  background-image:
+    radial-gradient(5px 3px at 30px 40px, rgb(247 190 214 / 0.85), transparent),
+    radial-gradient(3.5px 5px at 150px 120px, rgb(255 214 228 / 0.75), transparent),
+    radial-gradient(4.5px 2.5px at 90px 190px, rgb(242 170 200 / 0.75), transparent),
+    radial-gradient(3px 4px at 190px 30px, rgb(255 225 236 / 0.7), transparent);
+}
+.fx-petals-b {
+  --tile: 300px;
+  --dur: 27s;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(2.5px 1.5px at 60px 90px, rgb(255 230 240 / 0.9), transparent),
+    radial-gradient(2px 3px at 240px 250px, rgb(190 240 215 / 0.8), transparent);
+}
+
+/* Сердечка, що здіймаються */
+.fx-hearts {
+  --tile: 240px;
+  --dur: 20s;
+  opacity: 0.22;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cg fill='%23ff4f80'%3E%3Cpath d='M40 52c-6-5-14-10-14-17 0-4 3-7 7-7 3 0 5 2 7 4 2-2 4-4 7-4 4 0 7 3 7 7 0 7-8 12-14 17z'/%3E%3Cpath transform='translate(150 140) scale(.7)' d='M10 24C4 19-4 14-4 7c0-4 3-7 7-7 3 0 5 2 7 4 2-2 4-4 7-4 4 0 7 3 7 7 0 7-8 12-14 17z'/%3E%3Cpath transform='translate(190 40) scale(.45)' d='M10 24C4 19-4 14-4 7c0-4 3-7 7-7 3 0 5 2 7 4 2-2 4-4 7-4 4 0 7 3 7 7 0 7-8 12-14 17z'/%3E%3Cpath transform='translate(70 180) scale(.55)' d='M10 24C4 19-4 14-4 7c0-4 3-7 7-7 3 0 5 2 7 4 2-2 4-4 7-4 4 0 7 3 7 7 0 7-8 12-14 17z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Геловін: іскри, що піднімаються, і гарбузове сяйво знизу */
+.fx-embers {
+  --tile: 200px;
+  --dur: 14s;
+  background-image:
+    radial-gradient(3px 3px at 30px 40px, rgb(255 150 50 / 0.95), transparent),
+    radial-gradient(2px 2px at 140px 100px, rgb(255 190 90 / 0.85), transparent),
+    radial-gradient(2.5px 2.5px at 90px 170px, rgb(255 120 30 / 0.85), transparent),
+    radial-gradient(2px 2px at 170px 20px, rgb(255 170 70 / 0.8), transparent);
+}
+.fx-glow-bottom {
+  position: absolute;
+  inset: auto -20% -10% -20%;
+  height: 45%;
+  background: radial-gradient(ellipse at 50% 100%, rgb(255 120 20 / 0.22), transparent 65%);
+}
+
+/* Багряна класика: віньєтка */
+.fx-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 120% 90% at 50% 40%, transparent 55%, rgb(0 0 0 / 0.55));
+}
+
+/* Synthwave: сонце на горизонті й сітка, що «їде» назустріч */
+.fx-horizon {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 42%;
+  overflow: hidden;
+  perspective: 260px;
+  mask-image: linear-gradient(to top, black 30%, transparent);
+}
+.fx-sun {
+  position: absolute;
+  left: 50%;
+  bottom: 62%;
+  width: 220px;
+  height: 220px;
+  margin-left: -110px;
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 58%, var(--bg-main) 58% 62%, transparent 62% 68%, var(--bg-main) 68% 71%, transparent 71% 78%, var(--bg-main) 78% 80%),
+    linear-gradient(to bottom, #ffd84a, #ff2fb3 70%);
+  opacity: 0.55;
+  filter: blur(0.3px);
+}
+.fx-grid {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  top: 0;
+  height: 200%;
+  background-image:
+    linear-gradient(rgb(255 47 179 / 0.5) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgb(0 229 255 / 0.35) 1.5px, transparent 1.5px);
+  background-size: 48px 48px;
+  transform-origin: 50% 0;
+  will-change: transform;
+  animation: fx-grid 3s linear infinite;
+}
+@keyframes fx-grid {
+  from {
+    transform: rotateX(62deg) translateY(0);
+  }
+  to {
+    transform: rotateX(62deg) translateY(48px);
+  }
+}
+/* Scanlines «старого екрана» — тонкий шар поверх вмісту (під шторками) */
+.fx-scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.16) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+
+/* Ефекти не крутяться, поки відкрита шторка, і зовсім вимкнені при «менше руху» */
+body:has([role='dialog']) :is(.fx-fall, .fx-rise, .fx-grid) {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.fx-fall, .fx-rise, .fx-grid) {
+    animation: none;
+  }
+}
