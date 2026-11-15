@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check,
+  ChevronDown,
   Eye,
   FlameKindling,
   Package,
@@ -21,6 +22,7 @@ import {
   SHOP_ITEMS,
   buyBlocker,
   capOf,
+  displayedTheme,
   consumeBlocker,
   isThemeId,
   isUsableItemId,
@@ -74,7 +76,7 @@ export function ShopSheet() {
       {SHOP_CATEGORIES.map((cat) => {
         const Icon = CATEGORY_ICONS[cat.id]
         return (
-          <section key={cat.id} className="flex flex-col gap-3">
+          <section key={cat.id} className="flex flex-col gap-2">
             <h3 className="flex items-center gap-2 px-1 text-xs font-bold tracking-wider text-muted uppercase">
               <Icon className="size-4 text-primary" /> {cat.title}
             </h3>
@@ -127,43 +129,100 @@ function Balance({ game }: { game: GameState }) {
   )
 }
 
-/** Спільний каркас картки: шапка (іконка, назва, бейдж), опис, нижній ряд дій під тонкою лінією. */
+/**
+ * Спільний каркас картки. За замовчуванням згорнута — лише рядок: іконка, назва, мітка (скільки є /
+ * кольори теми), ціна чи статус. Тап — розгортає опис і дії. Так довгий список гортається швидко.
+ */
 function CardShell({
   item,
   index,
   badge,
+  summary,
   children,
 }: {
   item: ShopItem
   index: number
   badge: ReactNode
+  /** коротко праворуч у згорнутому стані: ціна, «Активна», «Максимум»… */
+  summary: ReactNode
   children: ReactNode
 }) {
+  const [open, setOpen] = useState(false)
   const { icon: Icon, color } = lookOf(item.id)
   return (
     <motion.article
+      layout="position"
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.04 + index * 0.04, type: 'spring', stiffness: 380, damping: 30 }}
-      className="card flex flex-col gap-4 rounded-3xl p-5"
+      transition={{ delay: 0.03 + index * 0.03, type: 'spring', stiffness: 380, damping: 30 }}
+      className={cn('card flex flex-col rounded-3xl transition-shadow', open && 'ring-1 ring-inset ring-white/[0.08]')}
     >
-      <div className="flex items-center gap-4">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex items-center gap-3 rounded-3xl p-3.5 text-left active:bg-white/[0.03]"
+      >
         <span
-          className="flex size-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset"
+          className="flex size-11 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset"
           style={{
             color,
             background: `color-mix(in oklab, ${color} 15%, transparent)`,
             ['--tw-ring-color' as string]: `color-mix(in oklab, ${color} 35%, transparent)`,
           }}
         >
-          <Icon className="size-6" strokeWidth={1.9} />
+          <Icon className="size-5.5" strokeWidth={1.9} />
         </span>
-        <h4 className="min-w-0 flex-1 text-base leading-tight font-bold">{item.title}</h4>
-        {badge}
-      </div>
-      <p className="text-[13px] leading-relaxed text-muted">{item.desc}</p>
-      <div className="flex min-h-10 items-center gap-3 border-t border-line/70 pt-4">{children}</div>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate text-[15px] leading-tight font-bold">{item.title}</span>
+          <span className="flex items-center">{badge}</span>
+        </span>
+        <AnimatePresence initial={false}>
+          {!open && (
+            <motion.span
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.15 }}
+              className="shrink-0"
+            >
+              {summary}
+            </motion.span>
+          )}
+        </AnimatePresence>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }} className="shrink-0 text-muted">
+          <ChevronDown className="size-5" />
+        </motion.span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-4 px-5 pt-1 pb-5">
+              <p className="text-[13px] leading-relaxed text-muted">{item.desc}</p>
+              <div className="flex min-h-10 items-center gap-3 border-t border-line/70 pt-4">{children}</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.article>
+  )
+}
+
+/** Ціна в згорнутому рядку; тьмяна, якщо калокоїнів бракує. */
+function PriceTag({ price, block }: { price: number | null; block: ReturnType<typeof buyBlocker> }) {
+  if (block === 'max_level' || price === null) return <span className="text-xs font-bold text-muted">Максимум</span>
+  if (block === 'inventory_full') return <span className="text-xs font-bold text-muted">Повний</span>
+  return (
+    <span className={cn('flex items-center gap-1 text-sm font-bold', block === 'not_enough_coins' ? 'text-muted' : 'text-coin')}>
+      {int(price)} <CoinIcon className="size-4" strokeWidth={2.2} />
+    </span>
   )
 }
 
@@ -206,7 +265,7 @@ function ItemCard({ item, game, index }: { item: ShopItem; game: GameState; inde
       animate={{ scale: [1, 1.25, 1] }}
       transition={{ duration: 0.4 }}
       className={cn(
-        'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold',
+        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold',
         owned > 0 ? 'bg-white/[0.08] text-fg' : 'bg-white/[0.04] text-muted',
       )}
     >
@@ -215,7 +274,7 @@ function ItemCard({ item, game, index }: { item: ShopItem; game: GameState; inde
   )
 
   return (
-    <CardShell item={item} index={index} badge={badge}>
+    <CardShell item={item} index={index} badge={badge} summary={<PriceTag price={price} block={buyBlock} />}>
       {usable && owned > 0 ? (
         useBlock ? (
           <span className="min-w-0 flex-1 text-xs text-muted">{USE_HINTS[useBlock] ?? ''}</span>
@@ -251,7 +310,7 @@ function ThemeCard({ item, game, index }: { item: ShopItem; game: GameState; ind
   if (!isThemeId(item.id)) return null
   const theme = item.id
   const owned = theme in game.themes
-  const active = game.activeTheme === theme
+  const active = displayedTheme(game, toDateKey()) === theme
   const price = priceOf(theme, game)
   const buyBlock = buyBlocker(theme, game)
 
@@ -263,7 +322,22 @@ function ThemeCard({ item, game, index }: { item: ShopItem; game: GameState; ind
   }
 
   return (
-    <CardShell item={item} index={index} badge={<Swatches colors={THEME_LOOK[theme].swatches} size="size-5" />}>
+    <CardShell
+      item={item}
+      index={index}
+      badge={<Swatches colors={THEME_LOOK[theme].swatches} size="size-3.5" />}
+      summary={
+        active ? (
+          <span className="flex items-center gap-1 text-xs font-bold text-primary">
+            <Check className="size-3.5" /> Активна
+          </span>
+        ) : owned ? (
+          <span className="text-xs font-bold text-muted">Куплено</span>
+        ) : (
+          <PriceTag price={price} block={buyBlock} />
+        )
+      }
+    >
       {!owned ? (
         <>
           {/* Примірка: 10 секунд теми на справжньому екрані, щоб не купувати наосліп */}

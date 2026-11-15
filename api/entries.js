@@ -39,10 +39,11 @@ function tzOffset(req) {
 /**
  * Підсумок дня для статистики. Як і гра — не валить уже збережений запис.
  * @param {import('../server/store.js').RedisClient} r @param {string} date
+ * @param {{ entries: import('../shared/model.js').Entry[], profile: import('../shared/model.js').Profile | null }} [read]
  */
-async function summary(r, date) {
+async function summary(r, date, read) {
   try {
-    await refreshDaySummary(r, date)
+    await refreshDaySummary(r, date, read?.profile, read?.entries)
   } catch (err) {
     console.error('summary refresh failed', err)
   }
@@ -66,15 +67,18 @@ export default handler(['PUT', 'DELETE'], async (req, res) => {
     // Запис уже збережено. Якщо гра не порахувалась (збій Redis) — не валимо запит,
     // інакше клієнт відкотить збережений запис і повтор створить дублікат.
     let game
+    /** @type {{ entries: import('../shared/model.js').Entry[], profile: import('../shared/model.js').Profile | null } | undefined} */
+    let read
     try {
-      game = await processEntrySaved(r, entry, existing, {
+      ;({ read, ...game } = await processEntrySaved(r, entry, existing, {
         tzOffset: tzOffset(req),
         copiedFromYesterday: query(req, 'source') === 'copy',
-      })
+      }))
     } catch (err) {
       console.error('game processing failed', err)
     }
-    await summary(r, entry.date)
+    // гра вже прочитала день і профіль — підсумок їх перевикористовує
+    await summary(r, entry.date, read)
     const foodId = query(req, 'food')
     if (!existing && foodId && ID_RE.test(foodId)) {
       try {

@@ -9,13 +9,12 @@ import { BodyCard } from '@/features/body/BodyCard'
 import { DailySummary } from '@/features/DailySummary'
 import { DateHeader } from '@/features/DateHeader'
 import { isDevEnabled } from '@/features/dev/devEnabled'
-import { AchievementUnlockModal } from '@/features/game/AchievementUnlockModal'
+import { LazyOverlays } from '@/features/game/LazyOverlays'
 import { RewardFeed } from '@/features/game/RewardFeed'
 import { StreakNotice } from '@/features/game/StreakNotice'
 import { DevPanel } from '@/features/lazySheets'
 import { MealSection } from '@/features/MealSection'
 import { StatsCard } from '@/features/stats/StatsCard'
-import { TryOnBanner } from '@/features/game/TryOnBanner'
 import { ModalHost } from '@/features/ModalHost'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -172,11 +171,10 @@ export default function App() {
         <Plus className="relative size-8" strokeWidth={2.5} />
       </motion.button>
 
-      <TryOnBanner />
       <ModalHost />
       <Toast />
       <RewardFeed />
-      <AchievementUnlockModal />
+      <LazyOverlays />
       {devEnabled && (
         <Suspense fallback={null}>
           <DevPanel />

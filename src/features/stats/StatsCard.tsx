@@ -23,7 +23,7 @@ export function StatsCard() {
   const max = Math.max(goals.kcal * 1.25, ...week.map((d) => map.get(d)?.kcal ?? 0))
 
   return (
-    <motion.div whileTap={{ scale: 0.985 }} className="card relative flex flex-col gap-4 rounded-3xl p-5">
+    <motion.div data-main-card whileTap={{ scale: 0.985 }} className="card relative flex flex-col gap-4 rounded-3xl p-5">
       <button
         type="button"
         onClick={() => openModal({ type: 'stats' })}

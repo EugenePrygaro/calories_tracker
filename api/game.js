@@ -6,7 +6,8 @@
  * POST /api/game { action: 'seen', id }           → { game, events }  модалку ачівки показано (не вискакувати знову)
  * POST /api/game { action: 'buy', item }          → { game, events }  купити товар у магазині
  * POST /api/game { action: 'use', item }          → { game, events }  використати товар з інвентарю
- * POST /api/game { action: 'theme', theme }       → { game, events }  увімкнути куплену тему ('default' — стандартна)
+ * POST /api/game { action: 'theme', theme }       → { game, events }  увімкнути куплену тему ('default' — стандартна,
+ *                                                                     'random' — щодня випадковий естетичний стиль)
  * POST /api/game { action: 'dev', op, amount }    → { game, events }  тестові дії (див. server/game.js)
  *
  * Калокоїни за їжу тут не нараховуються — це робить api/entries.js при збереженні запису.
@@ -90,7 +91,8 @@ export default handler(['GET', 'POST'], async (req, res) => {
       break
     case 'theme':
       try {
-        if (body.theme === state.activeTheme) return send(res, 200, { game: state, events })
+        const unchanged = body.theme === 'random' ? state.dailyRandomTheme : body.theme === state.activeTheme && !state.dailyRandomTheme
+        if (unchanged) return send(res, 200, { game: state, events })
         setTheme(state, body.theme)
       } catch (err) {
         throw shopHttpError(err)

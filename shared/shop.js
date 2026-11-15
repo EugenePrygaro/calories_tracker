@@ -13,11 +13,11 @@ import { BASE_SHIELD_SLOTS, REWARDS, grant, localToday, newDayAwards, payStreakW
 
 /** @typedef {'boosters' | 'holiday' | 'styles' | 'marketplace'} ShopCategory */
 /** Теми оформлення: святкові та естетичні стилі (кольори, ефекти, а в стилів — і шрифт). */
-/** @typedef {'newyear' | 'halloween' | 'spring' | 'valentine' | 'crimson' | 'synthwave'} ThemeId */
+/** @typedef {'newyear' | 'halloween' | 'spring' | 'valentine' | 'crimson' | 'synthwave' | 'obsidian' | 'amethyst' | 'espresso' | 'rainbow' | 'orbital'} ThemeId */
 /** @typedef {'shield' | 'cheatMeal' | 'boost' | 'superFlame' | 'shieldSlot' | 'temu' | ThemeId} ShopItemId */
 /** Товари, що лежать в інвентарі й використовуються окремою дією. */
 /** @typedef {'cheatMeal' | 'boost' | 'superFlame' | 'temu'} UsableItemId */
-/** @typedef {'unknown' | 'not_enough_coins' | 'inventory_full' | 'max_level' | 'none_left' | 'already_active' | 'kcal_done' | 'nothing_to_restore' | 'already_owned' | 'not_owned'} ShopErrorCode */
+/** @typedef {'unknown' | 'not_enough_coins' | 'inventory_full' | 'max_level' | 'none_left' | 'already_active' | 'kcal_done' | 'nothing_to_restore' | 'already_owned' | 'not_owned' | 'not_enough_styles'} ShopErrorCode */
 
 /**
  * @typedef {{
@@ -38,9 +38,11 @@ export const SHOP_CATEGORIES = [
 ]
 
 /** @type {readonly ThemeId[]} */
-export const THEME_IDS = ['newyear', 'halloween', 'spring', 'valentine', 'crimson', 'synthwave']
+export const THEME_IDS = ['newyear', 'halloween', 'spring', 'valentine', 'crimson', 'synthwave', 'obsidian', 'amethyst', 'espresso', 'rainbow', 'orbital']
 /** Тема за замовчуванням («Смарагдовий графіт») — безкоштовна й завжди доступна. */
 export const DEFAULT_THEME = 'default'
+/** Не тема, а режим: щодня випадковий естетичний стиль із куплених (див. dailyStyle). */
+export const RANDOM_THEME = 'random'
 
 /** @type {readonly ShopItem[]} */
 export const SHOP_ITEMS = [
@@ -120,6 +122,41 @@ export const SHOP_ITEMS = [
     title: 'Synthwave / 8-біт',
     desc: 'Неоновий рожевий і бірюзовий, футуристичний шрифт, сітка-горизонт і ефект старого екрана.',
     icon: 'Gamepad2',
+  },
+  {
+    id: 'obsidian',
+    category: 'styles',
+    title: 'Чорне золото',
+    desc: 'Obsidian Gold: глибокий вугільно-чорний фон, матові картки з тонкими золотими контурами, теплі акценти шампань і золотий пил, що повільно здіймається.',
+    icon: 'Crown',
+  },
+  {
+    id: 'amethyst',
+    category: 'styles',
+    title: 'Королівський аметист',
+    desc: 'Royal Amethyst: темно-індигові картки, світні лавандові й фіолетові акценти, делікатний фіолетовий градієнт на тлі й мерехтливі зорі.',
+    icon: 'Diamond',
+  },
+  {
+    id: 'espresso',
+    category: 'styles',
+    title: 'Еспресо',
+    desc: 'Espresso: насичені темно-кавові й бронзові поверхні, бурштинове й мідне підсвічування, пара над «чашкою», кавові зерна й крема на весь екран.',
+    icon: 'Coffee',
+  },
+  {
+    id: 'rainbow',
+    category: 'styles',
+    title: 'Райдужна',
+    desc: 'Усе в кольорах веселки й переливається: райдужні смуги й кнопки, контури карток, що змінюють барви, і північне сяйво на фоні.',
+    icon: 'Rainbow',
+  },
+  {
+    id: 'orbital',
+    category: 'styles',
+    title: 'Орбітальна',
+    desc: 'Бортовий комп’ютер космічного корабля: глибокий темно-синій космос, орбітальні кільця калорій, координатна сітка й крижано-блакитні акценти.',
+    icon: 'Orbit',
   },
   {
     id: 'temu',
@@ -304,8 +341,48 @@ export function consumeItem(state, id, now = Date.now(), tzOffset = 0) {
  * @param {GameState} state @param {unknown} id @param {number} [now]
  */
 export function setTheme(state, id, now = Date.now()) {
+  if (id === RANDOM_THEME) {
+    // випадковий стиль має сенс, коли є з чого обирати
+    if (ownedStyles(state).length < 2) throw new ShopError('not_enough_styles')
+    state.dailyRandomTheme = true
+    state.updatedAt = now
+    return
+  }
   if (id !== DEFAULT_THEME && !isThemeId(id)) throw new ShopError('unknown')
   if (isThemeId(id) && !(id in state.themes)) throw new ShopError('not_owned')
   state.activeTheme = /** @type {ThemeId | 'default'} */ (id)
+  state.dailyRandomTheme = false
   state.updatedAt = now
 }
+
+/** Естетичні стилі (без святкових тем) — з них обирається «стиль дня». */
+export const STYLE_THEME_IDS = /** @type {ThemeId[]} */ (SHOP_ITEMS.filter((x) => x.category === 'styles').map((x) => x.id))
+
+/** Куплені естетичні стилі. @param {GameState} state */
+export const ownedStyles = (state) => STYLE_THEME_IDS.filter((id) => id in state.themes)
+
+/** Детермінований номер від рядка — однаковий на всіх пристроях і без запитів. @param {string} s */
+function hash(s) {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+/**
+ * «Стиль дня»: випадковий із куплених естетичних стилів, але стабільний протягом дня
+ * (залежить лише від дати) і, якщо стилів кілька, — не той самий, що вчора.
+ * @param {GameState} state @param {string} date YYYY-MM-DD @returns {string}
+ */
+export function dailyStyle(state, date) {
+  const owned = ownedStyles(state)
+  if (owned.length === 0) return state.activeTheme
+  const pick = (/** @type {string} */ d) => hash(d) % owned.length
+  let i = pick(date)
+  const y = new Date(`${date}T00:00:00Z`)
+  y.setUTCDate(y.getUTCDate() - 1)
+  if (owned.length > 1 && i === pick(y.toISOString().slice(0, 10))) i = (i + 1) % owned.length
+  return /** @type {string} */ (owned[i])
+}
+
+/** Яка тема зараз на екрані: вибрана або «стиль дня». @param {GameState} state @param {string} date */
+export const displayedTheme = (state, date) => (state.dailyRandomTheme ? dailyStyle(state, date) : state.activeTheme)

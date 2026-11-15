@@ -31,7 +31,7 @@ export function MealSection({ meal, entries }: MealSectionProps) {
   }
 
   return (
-    <section className="card rounded-3xl">
+    <section data-main-card className="card rounded-3xl">
       <header className="flex items-center gap-3 p-4">
         <span
           className={cn(
@@ -58,6 +58,7 @@ export function MealSection({ meal, entries }: MealSectionProps) {
         </div>
         <IconButton
           label={`Додати: ${MEAL_LABELS[meal]}`}
+          data-meal-add
           onClick={() => openModal({ type: 'add', meal })}
           className="border border-primary/30 bg-primary/15 text-primary shadow-[0_0_14px_-4px_var(--accent-primary)] hover:bg-primary/25 hover:text-primary"
         >

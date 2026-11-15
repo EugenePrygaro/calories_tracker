@@ -165,11 +165,11 @@ test('тема: купується раз і назавжди, одразу вм
   setTheme(s, 'default', NOW)
   assert.equal(s.activeTheme, 'default')
   throwsCode(() => setTheme(s, 'synthwave', NOW), 'not_owned')
-  throwsCode(() => setTheme(s, 'rainbow', NOW), 'unknown')
+  throwsCode(() => setTheme(s, 'plaid', NOW), 'unknown')
   setTheme(s, 'newyear', NOW)
 
   // збережений стан: невідомі теми відкидаються, активна — лише куплена
-  const restored = sanitizeGame({ themes: { newyear: 1, rainbow: 2 }, activeTheme: 'synthwave' })
+  const restored = sanitizeGame({ themes: { newyear: 1, plaid: 2 }, activeTheme: 'synthwave' })
   assert.deepEqual(Object.keys(restored.themes), ['newyear'])
   assert.equal(restored.activeTheme, 'default')
   assert.equal(sanitizeGame({ themes: { crimson: 1 }, activeTheme: 'crimson' }).activeTheme, 'crimson')
@@ -190,4 +190,23 @@ test('«Фігня з Temu»: купується за ціну тижня сер
   assert.equal(s.inventory.temu, 0)
   assert.equal(events[0]?.type, 'notice')
   throwsCode(() => consumeItem(s, 'temu', NOW), 'none_left')
+})
+
+test('стиль дня: лише куплені естетичні стилі, стабільний протягом дня, не як учора', async () => {
+  const { dailyStyle, displayedTheme, setTheme, STYLE_THEME_IDS } = await import('../shared/shop.js')
+  const s = rich()
+  s.themes = { newyear: 1, crimson: 1, obsidian: 1, rainbow: 1 }
+  s.activeTheme = 'newyear'
+  throwsCode(() => setTheme({ ...s, themes: { crimson: 1, newyear: 1 } }, 'random', NOW), 'not_enough_styles')
+  setTheme(s, 'random', NOW)
+  assert.equal(s.dailyRandomTheme, true)
+  const days = ['2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']
+  const picks = days.map((d) => dailyStyle(s, d))
+  for (const p of picks) assert.ok(STYLE_THEME_IDS.includes(p) && p in s.themes && p !== 'newyear')
+  assert.equal(dailyStyle(s, '2026-11-14'), dailyStyle(s, '2026-11-14'))
+  assert.equal(displayedTheme(s, '2026-11-14'), picks[4])
+  // вибір конкретної теми вимикає «стиль дня»
+  setTheme(s, 'newyear', NOW)
+  assert.equal(s.dailyRandomTheme, false)
+  assert.equal(displayedTheme(s, '2026-11-14'), 'newyear')
 })

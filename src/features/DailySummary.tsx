@@ -28,7 +28,7 @@ export function DailySummary({ entries }: { entries: readonly Entry[] }) {
   const over = left < 0
 
   return (
-    <section className="card flex flex-col gap-4 rounded-3xl p-5">
+    <section data-summary data-main-card className="card flex flex-col gap-4 rounded-3xl p-5">
       {/* Дуга показує, скільки ще лишилось: повна на початку дня, тоншає з кожним записом */}
       <Gauge value={goals.kcal > 0 ? left / goals.kcal : 0} over={over} className="mx-auto -mb-4 w-44">
         <AnimatePresence mode="wait" initial={false}>

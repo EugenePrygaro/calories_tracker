@@ -31,7 +31,7 @@ export function BodyCard() {
       : null
 
   return (
-    <motion.div whileTap={{ scale: 0.985 }} className="card relative flex flex-col gap-4 rounded-3xl p-5 text-left">
+    <motion.div data-main-card whileTap={{ scale: 0.985 }} className="card relative flex flex-col gap-4 rounded-3xl p-5 text-left">
       {/* Уся картка — одна кнопка-підкладка; «Задати цільову вагу» лежить над нею окремою кнопкою
           (кнопка всередині кнопки — невалідна розмітка й плутанина для скрінрідера) */}
       <button

@@ -50,6 +50,7 @@ export function sanitizeGame(input) {
   const lostDate = dateOrNull(lost.date)
   for (const [id, at] of Object.entries(obj(o.themes))) if (isThemeId(id)) s.themes[id] = count(at)
   s.cheatDays = (Array.isArray(o.cheatDays) ? o.cheatDays : []).filter((d) => typeof d === 'string' && DATE_RE.test(d)).slice(-400)
+  s.dailyRandomTheme = o.dailyRandomTheme === true
   s.activeTheme = isThemeId(o.activeTheme) && o.activeTheme in s.themes ? o.activeTheme : DEFAULT_THEME
   s.lostStreak = lostDate ? { value: count(lost.value, 100_000), weeksPaid: count(lost.weeksPaid, 100_000), date: lostDate } : null
   s.proteinStreak = count(o.proteinStreak, 100_000)
@@ -118,7 +119,8 @@ function storedEntry(value) {
  *   tzOffset — Date#getTimezoneOffset() клієнта (для «ранньої пташки» і «нічного дожору»);
  *   copiedFromYesterday — запис створено кнопкою «Скопіювати з учора» (для «Дня бабака»)
  * @param {number} [now]
- * @returns {Promise<{ game: GameState, events: GameEvent[] }>}
+ * @returns {Promise<{ game: GameState, events: GameEvent[], read?: { entries: Entry[], profile: import('../shared/model.js').Profile | null } }>}
+ *   read — уже прочитані записи дня й профіль: їх перевикористовує підсумок статистики (менше команд Redis)
  */
 export async function processEntrySaved(r, entry, existing, opts, now = Date.now()) {
   // Записи не за «сьогодні/вчора» гру не чіпають — не витрачаємо команди Redis
@@ -162,7 +164,7 @@ export async function processEntrySaved(r, entry, existing, opts, now = Date.now
   )
   // лічильники ачівок можуть змінитися й без подій — зберігаємо завжди
   await saveGame(r, state)
-  return { game: state, events }
+  return { game: state, events, read: { entries, profile } }
 }
 
 // ─── Dev-інструменти ─────────────────────────────────────────────────────────

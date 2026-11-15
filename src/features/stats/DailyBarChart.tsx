@@ -28,6 +28,8 @@ interface DailyBarChartProps {
 }
 
 const PAD = { l: 4, r: 44, t: 26, b: 24 }
+/** До скількох стовпчиків анімуємо кожен окремо (тиждень, місяць). */
+const ANIMATED_BARS_MAX = 31
 const shortDate = (key: string) => fromDateKey(key).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
 
 /** «Гарний» крок осі: 1 / 2 / 5 × 10ⁿ. */
@@ -97,6 +99,7 @@ export function DailyBarChart({ bars, reference, signed = false, format, detail,
   const ax = active !== null ? cx(active) : 0
   const tooltipLeft = Math.min(Math.max(ax - 56, 0), Math.max(width - 112, 0))
   const drawKey = `${bars[0]?.date}-${bars.length}`
+  const animateBars = bars.length <= ANIMATED_BARS_MAX
 
   return (
     <div ref={ref} className="relative select-none" style={{ height }}>
@@ -131,6 +134,11 @@ export function DailyBarChart({ bars, reference, signed = false, format, detail,
             if (b.value === null) return null
             const top = Math.min(y(b.value), y0)
             const h = Math.max(Math.abs(y(b.value) - y0), 1.5)
+            const style = { fill: b.color, opacity: active !== null && active !== i ? 0.45 : b.faded ? 0.5 : 1 }
+            // місяць і довше — звичайні прямокутники: сотня анімацій лише гальмує відкриття
+            if (!animateBars) {
+              return <rect key={b.date} x={cx(i) - barW / 2} y={top} width={barW} height={h} rx={Math.min(barW / 2, 4)} style={style} />
+            }
             return (
               <motion.rect
                 key={`${drawKey}-${b.date}`}
@@ -140,7 +148,7 @@ export function DailyBarChart({ bars, reference, signed = false, format, detail,
                 initial={{ y: y0, height: 0 }}
                 animate={{ y: top, height: h }}
                 transition={{ duration: 0.5, delay: Math.min(i * 0.012, 0.4), ease: 'easeOut' }}
-                style={{ fill: b.color, opacity: active !== null && active !== i ? 0.45 : b.faded ? 0.5 : 1 }}
+                style={style}
               />
             )
           })}

@@ -36,10 +36,12 @@ function entriesOf(raw) {
 
 /**
  * Перерахувати підсумок дня після зміни його записів. Норма — на цю дату (вихідні — більша).
- * @param {RedisClient} r @param {string} date @param {ProfileOrNull} [profile] уже прочитаний профіль
+ * @param {RedisClient} r @param {string} date
+ * @param {ProfileOrNull} [profile] уже прочитаний профіль
+ * @param {import('../shared/model.js').Entry[]} [dayEntries] уже прочитані записи дня
  */
-export async function refreshDaySummary(r, date, profile) {
-  const entries = entriesOf(await r.hgetall(KEYS.day(date)))
+export async function refreshDaySummary(r, date, profile, dayEntries) {
+  const entries = dayEntries ?? entriesOf(await r.hgetall(KEYS.day(date)))
   if (entries.length === 0) {
     await r.hdel(KEYS.summary, date)
     return

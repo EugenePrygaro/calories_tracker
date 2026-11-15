@@ -30,7 +30,7 @@ export type GameAction =
   | { action: 'dismissNotice' }
   | { action: 'buy'; item: ShopItemId }
   | { action: 'use'; item: UsableItemId }
-  | { action: 'theme'; theme: ThemeId | 'default' }
+  | { action: 'theme'; theme: ThemeId | 'default' | 'random' }
   | { action: 'dev'; op: DevOp; amount?: number; id?: string }
 
 /** Сервер відповів помилкою (4xx/5xx). */

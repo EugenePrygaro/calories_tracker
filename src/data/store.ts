@@ -201,6 +201,7 @@ const SHOP_ERRORS: Partial<Record<ShopErrorCode, string>> = {
   nothing_to_restore: 'Немає обірваної серії, яку можна повернути',
   already_owned: 'Цю тему вже куплено',
   not_owned: 'Спершу купіть цю тему в магазині',
+  not_enough_styles: 'Для «стилю дня» потрібно щонайменше 2 куплені естетичні стилі',
 }
 
 function errorMessage(err: unknown): string {
@@ -523,18 +524,22 @@ export async function activateShopItem(item: UsableItemId): Promise<void> {
   await gameAction({ action: 'use', item })
 }
 
-/** Увімкнути тему (стандартну або куплену) — одразу локально, потім на сервері. */
-export async function chooseTheme(theme: AppTheme): Promise<void> {
+/**
+ * Увімкнути тему (стандартну чи куплену) або 'random' — щодня випадковий естетичний стиль.
+ * Одразу локально, потім на сервері; відмова — повертаємо як було.
+ */
+export async function chooseTheme(theme: AppTheme | 'random'): Promise<void> {
   const prev = useDataStore.getState().game
-  if (!prev || prev.activeTheme === theme) return
+  if (!prev) return
+  const random = theme === 'random'
+  if (random ? prev.dailyRandomTheme : prev.activeTheme === theme && !prev.dailyRandomTheme) return
   haptic(10)
-  useDataStore.setState({ game: { ...prev, activeTheme: theme } })
+  const next = random ? { ...prev, dailyRandomTheme: true } : { ...prev, activeTheme: theme, dailyRandomTheme: false }
+  useDataStore.setState({ game: next })
   try {
     await gameAction({ action: 'theme', theme })
   } catch (err) {
-    // сервер відмовив — повертаємо попередню тему, якщо її ніхто не змінив
-    const now = useDataStore.getState().game
-    if (now?.activeTheme === theme) useDataStore.setState({ game: { ...now, activeTheme: prev.activeTheme } })
+    if (useDataStore.getState().game === next) useDataStore.setState({ game: prev })
     throw err
   }
 }
@@ -626,10 +631,11 @@ export function loadStats(): Promise<void> {
  * Ліміти безкоштовних тарифів (Vercel Hobby, Upstash Free): кожен запит — це
  * виклик функції + команди Redis. Тому без фонового опитування: застосунок
  * особистий, усі зміни робимо самі й одразу бачимо. Оновлюємо при поверненні
- * у вкладку (не частіше ніж раз на хвилину) і при поверненні мережі; переглянуті
- * дні вважаються свіжими до наступного такого оновлення.
+ * у вкладку (не частіше ніж раз на 5 хвилин — знімок і локальні зміни й так показують
+ * актуальне; одразу, якщо змінилась дата) і при поверненні мережі; переглянуті дні
+ * вважаються свіжими до наступного такого оновлення.
  */
-const REFRESH_MIN_MS = 60_000
+const REFRESH_MIN_MS = 5 * 60_000
 const ONLINE_MIN_MS = 10_000
 const DATE_DEBOUNCE_MS = 250
 
@@ -659,7 +665,10 @@ export function startAutoRefresh(): () => void {
     if (Date.now() - lastRefresh > minMs) refresh()
   }
   const onVisible = () => {
-    if (document.visibilityState === 'visible') throttled(REFRESH_MIN_MS)()
+    if (document.visibilityState !== 'visible') return
+    // повернулись після півночі — оновлюємо одразу (перехід на новий день), інакше не частіше REFRESH_MIN_MS
+    if (toDateKey() !== lastToday) refresh()
+    else throttled(REFRESH_MIN_MS)()
   }
   const onOnline = throttled(ONLINE_MIN_MS)
 

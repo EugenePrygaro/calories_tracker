@@ -46,7 +46,7 @@ export function Gauge({ value, over = false, children, className }: GaugeProps) 
   const accent = over ? 'var(--danger)' : 'var(--accent-primary)'
 
   return (
-    <div className={`relative aspect-square ${className ?? ''}`}>
+    <div data-gauge className={`relative aspect-square ${className ?? ''}`}>
       <svg viewBox="0 0 200 200" className="absolute inset-0 size-full overflow-visible" aria-hidden>
         <defs>
           <linearGradient id={`${id}-ok`} x1="0" y1="1" x2="1" y2="0">

@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion'
-import { Check } from 'lucide-react'
+import { Check, Shuffle } from 'lucide-react'
+import { dailyStyle, ownedStyles } from '@shared/shop.js'
 import { chooseTheme, useGame } from '@/data/store'
 import { cn } from '@/lib/cn'
+import { toDateKey } from '@/lib/date'
 import type { AppTheme } from '@/lib/theme'
 import { ALL_THEMES, THEME_LOOK } from './themeStyle'
 
@@ -19,8 +21,9 @@ export function ThemePicker() {
     <section className="flex flex-col gap-3">
       <h3 className="text-xs font-bold tracking-wider text-muted uppercase">Тема оформлення</h3>
       <div role="radiogroup" aria-label="Тема оформлення" className="flex flex-col gap-2">
+        <DailyOption active={game.dailyRandomTheme} styles={ownedStyles(game).length} today={THEME_LOOK[dailyStyle(game, toDateKey()) as AppTheme]?.title} />
         {owned.map((t) => (
-          <ThemeOption key={t} theme={t} active={game.activeTheme === t} />
+          <ThemeOption key={t} theme={t} active={!game.dailyRandomTheme && game.activeTheme === t} />
         ))}
       </div>
     </section>
@@ -57,5 +60,35 @@ export function Swatches({ colors, size = 'size-4' }: { colors: readonly string[
         <span key={c} className={cn(size, 'rounded-full ring-2 ring-card')} style={{ background: c }} />
       ))}
     </span>
+  )
+}
+
+/** «Щодня випадковий стиль» — лише з куплених естетичних стилів (святкові не беруть участі). */
+function DailyOption({ active, styles, today }: { active: boolean; styles: number; today: string | undefined }) {
+  const can = styles >= 2
+  return (
+    <motion.button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      disabled={!can}
+      whileTap={can ? { scale: 0.96 } : {}}
+      onClick={() => void chooseTheme('random').catch(() => {})}
+      className={cn(
+        'flex items-center gap-2.5 rounded-2xl px-3 py-3 text-left ring-1 ring-inset transition-colors disabled:opacity-50',
+        active ? 'bg-primary/10 ring-primary/60' : 'bg-white/[0.03] ring-white/[0.07]',
+      )}
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[conic-gradient(from_0deg,#ff5e8a,#ffb03f,#ffe14d,#5ee08a,#4fc8ff,#a46bff,#ff5e8a)] text-white">
+        <Shuffle className="size-3.5" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="text-sm font-bold">Щодня випадковий стиль</span>
+        <span className="truncate text-[11px] text-muted">
+          {!can ? 'Потрібно щонайменше 2 куплені естетичні стилі' : active && today ? `Сьогодні: ${today}` : 'Лише естетичні стилі, без святкових'}
+        </span>
+      </span>
+      {active && <Check className="size-4 shrink-0 text-primary" />}
+    </motion.button>
   )
 }
