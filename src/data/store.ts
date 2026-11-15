@@ -12,6 +12,7 @@ import {
 } from '@shared/model.js'
 import { sanitizeBodyRecord, sanitizeEntry, sanitizeFood, sanitizeProfile } from '@shared/validate.js'
 import type { GameState } from '@shared/game.js'
+import type { DaySummary } from '@shared/stats.js'
 import type { ShopErrorCode, ShopItemId, UsableItemId } from '@shared/shop.js'
 import { toDateKey } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
@@ -53,6 +54,8 @@ interface DataState {
   bodyLoaded: boolean
   /** Гейміфікація: монети, стрік, щити, ачівки (рахує сервер) */
   game: GameState | null
+  /** Підсумки днів із сервера (статистика); дні, відкриті в цій сесії, свіжіші — див. useDaySummaries */
+  stats: DaySummary[] | null
   /** Скільки запитів на збереження зараз у дорозі. */
   saving: number
 }
@@ -66,6 +69,7 @@ export const useDataStore = create<DataState>()(() => ({
   bodyLoaded: false,
   saving: 0,
   game: null,
+  stats: null,
 }))
 
 const EMPTY_DAY: DayState = { entries: [], loaded: false, error: false, loadedAt: 0 }
@@ -508,6 +512,11 @@ export const useGame = (): GameState | null => useDataStore((s) => s.game)
 
 export const useTargetWeight = (): number | null => useDataStore((s) => s.profile?.targetWeight ?? null)
 
+/** Підсумки днів для статистики (один запит — увесь рік). */
+export function loadStats(): Promise<void> {
+  return guardedLoad(api.getStats, ({ days }) => useDataStore.setState({ stats: days })).catch(() => {})
+}
+
 // ─── Автооновлення ───────────────────────────────────────────────────────────
 
 /**
@@ -541,6 +550,7 @@ export function startAutoRefresh(): () => void {
     void guardedLoad(api.getFoods, ({ foods }) => useDataStore.setState({ foods, foodsLoaded: true })).catch(() => {})
     void guardedLoad(api.getBody, ({ records }) => useDataStore.setState({ body: records, bodyLoaded: true })).catch(() => {})
     void guardedLoad(api.getGame, ({ game }) => useDataStore.setState({ game: withPendingSeen(game) })).catch(() => {})
+    void loadStats()
   }
   const throttled = (minMs: number) => () => {
     if (Date.now() - lastRefresh > minMs) refresh()

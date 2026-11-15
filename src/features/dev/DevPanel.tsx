@@ -37,7 +37,7 @@ export function DevPanel() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 z-[70] flex items-center gap-1 rounded-full border border-secondary/60 bg-card px-3 py-2 text-xs font-bold text-secondary shadow-lg"
+        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-4 z-[70] flex items-center gap-1 rounded-full border border-secondary/60 bg-card px-3 py-2 text-xs font-bold text-secondary shadow-lg"
       >
         <Bug className="size-4" /> DEV
       </button>
@@ -48,7 +48,7 @@ export function DevPanel() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed inset-x-2 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[70] mx-auto flex max-h-[75dvh] max-w-[464px] flex-col rounded-2xl border border-secondary/60 bg-card shadow-2xl"
+            className="fixed inset-x-2 bottom-[calc(7.5rem+env(safe-area-inset-bottom))] z-[70] mx-auto flex max-h-[75dvh] max-w-[464px] flex-col rounded-2xl border border-secondary/60 bg-card shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-line px-4 py-2">
               <b className="text-sm">DEV · гейміфікація</b>

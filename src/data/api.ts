@@ -1,6 +1,7 @@
 import type { GameEvent, GameState } from '@shared/game.js'
 import type { BodyRecord, Entry, Food, FoodItem, Profile } from '@shared/model.js'
 import type { ShopItemId, ThemeId, UsableItemId } from '@shared/shop.js'
+import type { DaySummary } from '@shared/stats.js'
 
 export interface GameResult {
   game: GameState
@@ -125,6 +126,9 @@ export const api = {
   deleteBody: (date: string) => request<{ ok: true }>('DELETE', `/api/body?date=${q(date)}`),
 
   getGame: () => request<{ game: GameState }>('GET', '/api/game'),
+
+  /** Підсумки всіх днів із записами — для статистики й теплової карти. */
+  getStats: () => request<{ days: DaySummary[] }>('GET', '/api/stats'),
 
   gameAction: (body: GameAction) => request<GameResult>('POST', '/api/game', body),
 

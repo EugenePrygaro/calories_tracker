@@ -10,6 +10,8 @@ export type Modal =
   | { type: 'body' }
   | { type: 'achievements' }
   | { type: 'shop' }
+  | { type: 'stats' }
+  | { type: 'calc' }
 
 interface Toast {
   id: number

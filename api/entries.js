@@ -11,6 +11,7 @@
  */
 import { handler, HttpError, query, readJson, send } from '../server/http.js'
 import { processEntrySaved } from '../server/game.js'
+import { refreshDaySummary } from '../server/stats.js'
 import { KEYS, parseStored, redis } from '../server/store.js'
 import { requireDate, requireId, sanitizeEntry } from '../shared/validate.js'
 
@@ -30,6 +31,18 @@ function storedEntry(value) {
 function tzOffset(req) {
   const raw = Number(req.headers['x-tz-offset'])
   return Number.isInteger(raw) && Math.abs(raw) <= 840 ? raw : 0
+}
+
+/**
+ * Підсумок дня для статистики. Як і гра — не валить уже збережений запис.
+ * @param {import('../server/store.js').RedisClient} r @param {string} date
+ */
+async function summary(r, date) {
+  try {
+    await refreshDaySummary(r, date)
+  } catch (err) {
+    console.error('summary refresh failed', err)
+  }
 }
 
 export default handler(['PUT', 'DELETE'], async (req, res) => {
@@ -58,10 +71,12 @@ export default handler(['PUT', 'DELETE'], async (req, res) => {
     } catch (err) {
       console.error('game processing failed', err)
     }
+    await summary(r, entry.date)
     return send(res, 200, { applied: true, entry, ...(game ? { game } : {}) })
   }
 
   const date = requireDate(query(req, 'date'))
   await r.hdel(KEYS.day(date), id)
+  await summary(r, date)
   send(res, 200, { ok: true })
 })

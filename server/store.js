@@ -6,7 +6,9 @@
  *   ct:profile           string  Profile { goals, updatedAt }
  *   ct:foods             hash    id страви → Food («Мої страви»)
  *   ct:body              hash    дата → BodyRecord (вага й об'єми, один запис на день)
- *   ct:game              string  GameState: монети, стрік, щити, видані нагороди, ачівки
+ *   ct:game              string  GameState: калокоїни, стрік, щити, магазин, ачівки
+ *   ct:summary           hash    дата → DaySummary (підсумок дня для статистики, див. server/stats.js)
+ *   ct:summary:ready     string  позначка: підсумки вже побудовано з наявних днів
  *   ct:off:<запит>       string  FoodItem[] — кеш пошуку Open Food Facts, TTL 1 доба
  *
  * Один hash на день: знімок дня читається одним HGETALL,
@@ -24,6 +26,7 @@ import { HttpError } from './http.js'
  *   hgetall(key: string): Promise<Record<string, unknown> | null>,
  *   hset(key: string, values: Record<string, unknown>): Promise<unknown>,
  *   hdel(key: string, ...fields: string[]): Promise<unknown>,
+ *   keys(pattern: string): Promise<string[]>,
  * }} RedisClient
  */
 
@@ -34,6 +37,8 @@ export const KEYS = {
   foods: 'ct:foods',
   body: 'ct:body',
   game: 'ct:game',
+  summary: 'ct:summary',
+  summaryReady: 'ct:summary:ready',
   /** @param {string} query нормалізований запит */
   offSearch: (query) => `ct:off:${query}`,
 }

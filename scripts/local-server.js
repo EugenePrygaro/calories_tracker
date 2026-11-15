@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { KEYS, setRedisClient } from '../server/store.js'
 import { DEFAULT_GOALS } from '../shared/model.js'
 import { MemoryRedis } from './memory-redis.js'
-import { MOCK_TARGET_WEIGHT, mockBody, mockEntries, mockFoods, todayKey } from './mock-data.js'
+import { MOCK_TARGET_WEIGHT, mockBody, mockEntries, mockFoods, mockHistory, todayKey } from './mock-data.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dataFile = process.env.DEV_DATA_FILE || path.join(root, '.data', 'dev-redis.json')
@@ -43,6 +43,20 @@ if (!process.env.NO_SEED && !(await store.hgetall(KEYS.body))) {
     })
   }
   console.log(`  ➜  Мокові заміри: ${records.length} записів, ціль ${MOCK_TARGET_WEIGHT} кг`)
+}
+
+// Історія записів за ~4 місяці — для статистики й теплової карти (лише в порожні дні).
+if (!process.env.NO_SEED && !(await store.get('ct:seed:history'))) {
+  const foods = mockFoods()
+  const history = mockHistory(120, foods)
+  for (const [date, entries] of Object.entries(history)) {
+    if (!(await store.hgetall(KEYS.day(date)))) {
+      await store.hset(KEYS.day(date), Object.fromEntries(entries.map((e) => [e.id, e])))
+    }
+  }
+  await store.set('ct:seed:history', 1)
+  await store.set(KEYS.summaryReady, 0) // підсумки перебудуються з усіх днів при першому запиті
+  console.log(`  ➜  Мокова історія: ${Object.keys(history).length} днів записів`)
 }
 
 /**

@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
-import { useCallback, useId, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useId, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { fromDateKey } from '@/lib/date'
 import { kg } from '@/lib/format'
+import { useWidth } from '@/lib/useWidth'
 
 export interface WeightPoint {
   date: string
@@ -29,17 +30,6 @@ function niceTicks(min: number, max: number, count = 4): number[] {
   const ticks: number[] = []
   for (let v = start; v <= end + step / 2; v += step) ticks.push(Math.round(v * 100) / 100)
   return ticks
-}
-
-/** Ширина контейнера через ResizeObserver (графік рисується в реальних пікселях — текст не тягнеться). */
-function useWidth(): [(el: HTMLDivElement | null) => () => void, number] {
-  const [width, setWidth] = useState(0)
-  const ref = useCallback((el: HTMLDivElement | null) => {
-    const ro = new ResizeObserver(([entry]) => setWidth(Math.round(entry?.contentRect.width ?? 0)))
-    if (el) ro.observe(el)
-    return () => ro.disconnect() // React 19: прибирання для callback-ref
-  }, [])
-  return [ref, width]
 }
 
 /**

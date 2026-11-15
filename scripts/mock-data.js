@@ -146,3 +146,79 @@ export function mockBody(now = Date.now()) {
 
 /** Цільова вага для мокового профілю. */
 export const MOCK_TARGET_WEIGHT = 60
+
+/** Меню для історії: варіанти кожного прийому їжі [slug, грами][] */
+/** @type {Record<MealType, [string, number][][]>} */
+const HISTORY_MENU = {
+  breakfast: [
+    [['oatmeal', 250], ['latte', 250]],
+    [['cottage', 200], ['banana', 120]],
+    [['egg', 110], ['ryebread', 40], ['latte', 250]],
+  ],
+  lunch: [
+    [['borscht', 350], ['ryebread', 40], ['chicken', 150]],
+    [['buckwheat', 250], ['chicken', 150], ['salad', 150]],
+    [['vareniki', 250], ['salad', 150]],
+  ],
+  dinner: [
+    [['rice', 200], ['chicken', 150]],
+    [['buckwheat', 200], ['egg', 110]],
+    [['cottage', 200], ['apple', 180]],
+  ],
+  snack: [
+    [['yogurt', 150], ['banana', 120]],
+    [['apple', 180], ['peanut', 20]],
+    [['yogurt', 150]],
+  ],
+}
+
+/** Детермінований «випадок» від рядка: однакові дані між перезапусками. @param {string} s */
+function rand(s) {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
+  return ((h >>> 0) % 10000) / 10000
+}
+
+/**
+ * Записи за минулі дні: різні меню й порції (≈1450–2400 ккал), ~12% днів пропущено.
+ * @param {number} days скільки днів назад від учора
+ * @param {Food[]} foods
+ * @returns {Record<string, Entry[]>} дата → записи
+ */
+export function mockHistory(days, foods, now = new Date()) {
+  const bySlug = new Map(foods.map((f) => [f.id.replace('seed-food-', ''), f]))
+  /** @type {Record<string, Entry[]>} */
+  const out = {}
+  for (let back = 1; back <= days; back++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back)
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (rand(date + 'skip') < 0.12) continue
+    const scale = 0.85 + rand(date + 'scale') * 0.5
+    /** @type {Entry[]} */
+    const entries = []
+    for (const [mi, meal] of /** @type {MealType[]} */ (['breakfast', 'lunch', 'dinner', 'snack']).entries()) {
+      const options = HISTORY_MENU[meal]
+      const pick = options[Math.floor(rand(date + meal) * options.length)] ?? []
+      for (const [slug, grams] of pick) {
+        const food = bySlug.get(slug)
+        if (!food) continue
+        const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8 + mi * 4, entries.length).getTime()
+        entries.push(
+          sanitizeEntry({
+            id: `seed-${date}-${entries.length + 1}`,
+            date,
+            meal,
+            mode: 'weight',
+            name: food.name,
+            grams: Math.round((grams * scale) / 5) * 5,
+            per100: food.per100,
+            createdAt: at,
+            updatedAt: at,
+          }),
+        )
+      }
+    }
+    out[date] = entries
+  }
+  return out
+}

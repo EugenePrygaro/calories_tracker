@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
-import { CloudOff, Plus } from 'lucide-react'
+import { Calculator, CloudOff, Plus } from 'lucide-react'
 import { useEffect } from 'react'
 import { MEAL_TYPES } from '@shared/model.js'
 import { ThemeEffects } from '@/components/ThemeEffects'
@@ -13,6 +13,7 @@ import { AchievementUnlockModal } from '@/features/game/AchievementUnlockModal'
 import { RewardFeed } from '@/features/game/RewardFeed'
 import { StreakNotice } from '@/features/game/StreakNotice'
 import { MealSection } from '@/features/MealSection'
+import { StatsCard } from '@/features/stats/StatsCard'
 import { ModalHost } from '@/features/ModalHost'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -121,6 +122,23 @@ export default function App() {
       <motion.div custom={5} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show">
         <BodyCard />
       </motion.div>
+      <motion.div custom={6} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show">
+        <StatsCard />
+      </motion.div>
+
+      {/* Калькулятор порцій — ліворуч, удвічі менший за «плюс» і на одній з ним осі */}
+      <motion.button
+        type="button"
+        aria-label="Калькулятор порцій"
+        onTap={() => openModal({ type: 'calc' })}
+        whileTap={{ scale: 0.88 }}
+        initial={introPlayed ? false : { scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.6, type: 'spring', stiffness: 380, damping: 22 }}
+        className="card fixed bottom-[calc(1.25rem+12px+env(safe-area-inset-bottom))] left-5 z-30 flex size-10 items-center justify-center rounded-full text-primary shadow-lg"
+      >
+        <Calculator className="size-5" strokeWidth={2} />
+      </motion.button>
 
       {/* Головна дія — в зоні великого пальця */}
       <motion.button

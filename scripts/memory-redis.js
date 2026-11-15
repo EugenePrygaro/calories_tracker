@@ -79,6 +79,13 @@ export class MemoryRedis {
     return Object.keys(values).length
   }
 
+  /** Лише шаблони з * (як у проєкті: ct:day:*). @param {string} pattern */
+  async keys(pattern) {
+    const parts = pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, (ch) => '\\' + ch))
+    const re = new RegExp('^' + parts.join('.*') + '$')
+    return [...this.data.keys()].filter((k) => re.test(k))
+  }
+
   /** @param {string} k @param {...string} fields */
   async hdel(k, ...fields) {
     const h = this.hash(k)
