@@ -136,6 +136,9 @@ function BodySkeleton() {
 function TargetProgress({ current, start, target }: { current: number; start: number; target: number }) {
   const left = Math.round(Math.abs(current - target) * 10) / 10
   const progress = targetProgress(start, current, target)
+  // від старту вага пішла не в бік цілі: смужка порожня з червоною обводкою + скільки кг від старту
+  const away = Math.abs(current - target) > Math.abs(start - target)
+  const drift = Math.round((current - start) * 10) / 10
   return (
     <div className="pointer-events-none flex flex-col gap-2">
       <div className="flex items-center justify-between text-xs">
@@ -152,7 +155,21 @@ function TargetProgress({ current, start, target }: { current: number; start: nu
           )}
         </span>
       </div>
-      <ProgressBar value={progress * 100} max={100} className="h-2.5" sheenDelay={2.2} />
+      <ProgressBar
+        value={away ? 0 : progress * 100}
+        max={100}
+        className={away ? 'h-2.5 outline outline-offset-1 outline-danger/80' : 'h-2.5'}
+        sheenDelay={2.2}
+        label="Прогрес до цільової ваги"
+      />
+      {away && (
+        <span className="flex items-center gap-1.5 text-xs text-danger">
+          {drift > 0 ? <TrendingUp className="size-4 shrink-0" /> : <TrendingDown className="size-4 shrink-0" />}
+          <span className="min-w-0">
+            <b className="whitespace-nowrap">{signed(drift)} кг</b> від старту ({kg(start)} кг)
+          </span>
+        </span>
+      )}
     </div>
   )
 }

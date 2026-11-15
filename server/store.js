@@ -9,6 +9,8 @@
  *   ct:game              string  GameState: калокоїни, стрік, щити, магазин, ачівки
  *   ct:summary           hash    дата → DaySummary (підсумок дня для статистики, див. server/stats.js)
  *   ct:summary:ready     string  позначка: підсумки вже побудовано з наявних днів
+ *   ct:usage             hash    id страви → { n, last } — «Нещодавні» й «Часті» в пошуку (server/usage.js)
+ *   ct:usage:ready       string  позначка: лічильники вже побудовано з історії
  *   ct:off:<запит>       string  FoodItem[] — кеш пошуку Open Food Facts, TTL 1 доба
  *
  * Один hash на день: знімок дня читається одним HGETALL,
@@ -39,6 +41,8 @@ export const KEYS = {
   game: 'ct:game',
   summary: 'ct:summary',
   summaryReady: 'ct:summary:ready',
+  usage: 'ct:usage',
+  usageReady: 'ct:usage:ready',
   /** @param {string} query нормалізований запит */
   offSearch: (query) => `ct:off:${query}`,
 }

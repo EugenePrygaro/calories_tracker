@@ -3,6 +3,12 @@ import type { BodyRecord, Entry, Food, FoodItem, Profile } from '@shared/model.j
 import type { ShopItemId, ThemeId, UsableItemId } from '@shared/shop.js'
 import type { DaySummary } from '@shared/stats.js'
 
+/** Скільки разів і коли востаннє додавали страву (для «Нещодавні» / «Часті»). */
+export interface FoodUsage {
+  n: number
+  last: number
+}
+
 export interface GameResult {
   game: GameState
   events: GameEvent[]
@@ -98,10 +104,10 @@ export const api = {
    * У відповіді — і стан гри з подіями (нагороди нараховує сервер при збереженні).
    * source='copy' — запис створено кнопкою «Скопіювати з учора».
    */
-  putEntry: (entry: Entry, source?: 'copy') =>
+  putEntry: (entry: Entry, source?: 'copy', foodId?: string) =>
     request<{ applied: boolean; entry: Entry; game?: GameResult }>(
       'PUT',
-      `/api/entries?id=${q(entry.id)}${source ? `&source=${source}` : ''}`,
+      `/api/entries?id=${q(entry.id)}${source ? `&source=${source}` : ''}${foodId ? `&food=${q(foodId)}` : ''}`,
       { entry },
     ),
 
@@ -113,7 +119,7 @@ export const api = {
   putProfile: (profile: Profile) =>
     request<{ applied: boolean; profile: Profile }>('PUT', '/api/profile', { profile }),
 
-  getFoods: () => request<{ foods: Food[] }>('GET', '/api/foods'),
+  getFoods: () => request<{ foods: Food[]; usage?: Record<string, FoodUsage> }>('GET', '/api/foods'),
 
   putFood: (food: Food) =>
     request<{ applied: boolean; food: Food }>('PUT', `/api/foods?id=${q(food.id)}`, { food }),

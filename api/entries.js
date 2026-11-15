@@ -4,6 +4,7 @@
  *
  * PUT    /api/entries?id=…          { entry } → створити або замінити
  *        &source=copy                          запис скопійовано з учора (рахується для ачівки)
+ *        &food=…                               запис додано з «Моїх страв» (для «Нещодавні» / «Часті»)
  * DELETE /api/entries?id=…&date=…            → видалити
  *
  * Конфлікти: перемагає версія з більшим updatedAt. Якщо на сервері новіша,
@@ -12,7 +13,9 @@
 import { handler, HttpError, query, readJson, send } from '../server/http.js'
 import { processEntrySaved } from '../server/game.js'
 import { refreshDaySummary } from '../server/stats.js'
+import { recordUsage } from '../server/usage.js'
 import { KEYS, parseStored, redis } from '../server/store.js'
+import { ID_RE } from '../shared/model.js'
 import { requireDate, requireId, sanitizeEntry } from '../shared/validate.js'
 
 /** @param {unknown} value */
@@ -72,6 +75,14 @@ export default handler(['PUT', 'DELETE'], async (req, res) => {
       console.error('game processing failed', err)
     }
     await summary(r, entry.date)
+    const foodId = query(req, 'food')
+    if (!existing && foodId && ID_RE.test(foodId)) {
+      try {
+        await recordUsage(r, foodId, entry.createdAt)
+      } catch (err) {
+        console.error('usage update failed', err)
+      }
+    }
     return send(res, 200, { applied: true, entry, ...(game ? { game } : {}) })
   }
 

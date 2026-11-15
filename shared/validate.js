@@ -13,6 +13,7 @@ import {
   QUICK_ADD_NAME,
 } from './model.js'
 import { round1, scale } from './nutrition.js'
+import { DEFAULT_WEEKEND_BOOST } from './goals.js'
 
 /** @typedef {import('./model.js').Entry} Entry */
 /** @typedef {import('./model.js').Food} Food */
@@ -191,6 +192,10 @@ export function sanitizeProfile(input) {
   return {
     goals: sanitizeGoals(o.goals),
     targetWeight: isBlank(o.targetWeight) ? null : num(o.targetWeight, 'targetWeight', weight.min, weight.max),
+    // старий профіль без поля — надбавка за замовчуванням
+    weekendBoost: isBlank(o.weekendBoost)
+      ? DEFAULT_WEEKEND_BOOST
+      : Math.round(num(o.weekendBoost, 'weekendBoost', LIMITS.weekendBoost.min, LIMITS.weekendBoost.max)),
     updatedAt: timestamp(o.updatedAt, 'updatedAt'),
   }
 }
@@ -223,5 +228,6 @@ export function sanitizeBodyRecord(input) {
 export const DEFAULT_PROFILE = /** @type {Readonly<Profile>} */ ({
   goals: DEFAULT_GOALS,
   targetWeight: null,
+  weekendBoost: DEFAULT_WEEKEND_BOOST,
   updatedAt: 0,
 })

@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { LoaderCircle } from 'lucide-react'
+import { Suspense, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { useUiStore, type Modal as ModalState } from '@/store/ui'
-import { AddFoodSheet } from './add/AddFoodSheet'
-import { BodySheet } from './body/BodySheet'
-import { AchievementsSheet } from './game/AchievementsSheet'
-import { ShopSheet } from './game/ShopSheet'
-import { CalcSheet } from './calc/CalcSheet'
-import { StatsSheet } from './stats/StatsSheet'
-import { EditEntryForm } from './EditEntryForm'
-import { GoalsForm } from './GoalsForm'
+import {
+  AchievementsSheet,
+  AddFoodSheet,
+  BodySheet,
+  CalcSheet,
+  CalendarSheet,
+  EditEntryForm,
+  GoalsForm,
+  ShopSheet,
+  StatsSheet,
+} from './lazySheets'
+
+const TALL: ReadonlySet<ModalState['type']> = new Set(['add', 'body', 'achievements', 'shop', 'stats', 'calc'])
 
 function titleOf(m: ModalState): string {
   switch (m.type) {
@@ -28,6 +34,8 @@ function titleOf(m: ModalState): string {
       return 'Статистика'
     case 'calc':
       return 'Калькулятор порцій'
+    case 'calendar':
+      return 'Календар'
   }
 }
 
@@ -41,7 +49,15 @@ export function ModalHost() {
   if (modal && modal !== shown) setShown(modal)
 
   return (
-    <Modal open={modal !== null} title={shown ? titleOf(shown) : ''} onClose={close} tall={shown?.type === 'add' || shown?.type === 'body' || shown?.type === 'achievements' || shown?.type === 'shop' || shown?.type === 'stats' || shown?.type === 'calc'}>
+    <Modal open={modal !== null} title={shown ? titleOf(shown) : ''} onClose={close} tall={!!shown && TALL.has(shown.type)}>
+      {/* Шторки — окремими чанками (див. lazySheets); зазвичай уже підтягнуті заздалегідь */}
+      <Suspense
+        fallback={
+          <div className="flex flex-1 items-center justify-center py-16 text-muted">
+            <LoaderCircle className="size-6 animate-spin" />
+          </div>
+        }
+      >
       {shown?.type === 'add' && <AddFoodSheet key={JSON.stringify(shown)} initialMeal={shown.meal} onDone={close} />}
       {shown?.type === 'edit' && (
         <EditEntryForm key={shown.entryId} date={shown.date} entryId={shown.entryId} onDone={close} />
@@ -52,6 +68,8 @@ export function ModalHost() {
       {shown?.type === 'shop' && <ShopSheet />}
       {shown?.type === 'stats' && <StatsSheet />}
       {shown?.type === 'calc' && <CalcSheet />}
+      {shown?.type === 'calendar' && <CalendarSheet onDone={close} />}
+      </Suspense>
     </Modal>
   )
 }

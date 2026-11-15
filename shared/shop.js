@@ -83,7 +83,7 @@ export const SHOP_ITEMS = [
     id: 'newyear',
     category: 'holiday',
     title: 'Новорічна',
-    desc: 'Хвойні відтінки, золоті рамки й сніг, що падає на фоні.',
+    desc: 'Морозна синя гама, крижані рамки й сніг, що падає на фоні.',
     icon: 'TreePine',
   },
   {
@@ -133,12 +133,13 @@ export const SHOP_ITEMS = [
 /**
  * Ціни в калокоїнах. Орієнтир — до 60 за день ідеальної гри (+100 за тиждень серії):
  * заморозка ≈ 2,5 дня, читміл ≈ 3 дні, супер вогник ≈ 6 днів;
- * бустер дешевий — за день він дає максимум +60 зверху.
+ * бустер: звичайний день (≈ 40–45 за їжу й норми) він лише окуповує, вигідний —
+ * коли плануєте закрити все (+60 зверху). Інакше його вигідно було б купувати щодня.
  */
 export const PRICES = {
   shield: 150,
   cheatMeal: 180,
-  boost: 30,
+  boost: 50,
   superFlame: 350,
   /** ≈ тиждень серії: 7 × 60 + 100 за тиждень */
   temu: 520,
@@ -148,6 +149,8 @@ export const SLOT_PRICES = [400, 800]
 export const MAX_SHIELD_SLOTS = BASE_SHIELD_SLOTS + SLOT_PRICES.length
 /** Тема — «середня» покупка: приблизно 10 днів серії (10 × 60 + тижневий бонус ≈ 700). */
 export const THEME_PRICE = 600
+/** Скільки днів із читмілом пам'ятаємо для статистики (з запасом на роки). */
+export const MAX_CHEAT_DAYS = 400
 /** Скільки однакових товарів можна тримати в інвентарі. */
 export const MAX_STACK = 9
 
@@ -276,6 +279,8 @@ export function consumeItem(state, id, now = Date.now(), tzOffset = 0) {
     const day = (state.days[today] ??= newDayAwards())
     day.cheat = true
     day.kcal = true
+    // назавжди (прапорці днів тримаються лише тиждень) — для статистики й теплової карти
+    if (!state.cheatDays.includes(today)) state.cheatDays = [...state.cheatDays, today].slice(-MAX_CHEAT_DAYS)
     const coins = state.boostDate === today ? REWARDS.kcal * 2 : REWARDS.kcal
     grant(state, coins, 'kcal', 'Читміл: день зараховано', events)
   } else if (id === 'temu') {

@@ -11,26 +11,13 @@ import { useGameUi } from '@/store/gameUi'
 import { useUiStore } from '@/store/ui'
 
 /**
- * Інструменти для тестування гейміфікації. Видно в `npm run dev`, а на Vercel —
- * після відкриття адреси з `?dev` (запам'ятовується; `?dev=0` вимикає).
+ * Інструменти для тестування гейміфікації. Монтується лише коли ввімкнено (див. devEnabled.ts).
  * Серверні dev-дії вимикаються змінною середовища DISABLE_DEV_TOOLS=1.
  */
-function isDevEnabled(): boolean {
-  if (import.meta.env.DEV) return true
-  try {
-    const param = new URLSearchParams(location.search).get('dev')
-    if (param !== null) localStorage.setItem('dev:enabled', param === '0' ? '0' : '1')
-    return localStorage.getItem('dev:enabled') === '1'
-  } catch {
-    return false
-  }
-}
-
 export function DevPanel() {
-  const [enabled] = useState(isDevEnabled)
   const sheetOpen = useUiStore((s) => s.modal !== null)
   const [open, setOpen] = useState(false)
-  if (!enabled || sheetOpen) return null
+  if (sheetOpen) return null
 
   return (
     <>

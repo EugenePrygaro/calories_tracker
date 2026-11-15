@@ -6,7 +6,6 @@ import { Segmented } from '@/components/ui/Segmented'
 import { haptic } from '@/lib/haptics'
 import { ManualStep } from './ManualStep'
 import { PortionStep } from './PortionStep'
-import { QuickStep } from './QuickStep'
 import { SearchStep } from './SearchStep'
 import { YesterdayStep } from './YesterdayStep'
 
@@ -14,7 +13,6 @@ type Step =
   | { type: 'search' }
   | { type: 'portion'; item: FoodItem }
   | { type: 'manual' }
-  | { type: 'quick' }
   | { type: 'yesterday' }
 
 const MEAL_OPTIONS = MEAL_TYPES.map((m) => ({ value: m, label: MEAL_LABELS[m] }))
@@ -82,13 +80,11 @@ export function AddFoodSheet({ initialMeal, onDone }: { initialMeal: MealType; o
               onQuery={setQuery}
               onPick={(item) => go({ type: 'portion', item })}
               onManual={() => go({ type: 'manual' })}
-              onQuick={() => go({ type: 'quick' })}
               onYesterday={() => go({ type: 'yesterday' })}
             />
           )}
           {step.type === 'portion' && <PortionStep item={step.item} meal={meal} onDone={onDone} />}
           {step.type === 'manual' && <ManualStep meal={meal} initialName={query.trim()} onDone={onDone} />}
-          {step.type === 'quick' && <QuickStep meal={meal} onDone={onDone} />}
           {step.type === 'yesterday' && <YesterdayStep meal={meal} onDone={onDone} />}
         </motion.div>
       </AnimatePresence>

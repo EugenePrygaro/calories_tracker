@@ -64,13 +64,19 @@ export function Gauge({ value, over = false, children, className }: GaugeProps) 
         ))}
 
         <path d={ARC} fill="none" strokeWidth="10" strokeLinecap="round" style={{ stroke: 'rgb(255 255 255 / 0.06)' }} />
+        {/* Сяйво — дві ширші напівпрозорі лінії під дугою. Замість filter: drop-shadow:
+            фільтр на анімованій лінії перемальовувався на кожному кадрі (відчутно на телефонах). */}
+        <motion.g style={{ opacity: visible }}>
+          <motion.path d={ARC} fill="none" strokeWidth="24" strokeLinecap="round" opacity={0.08} style={{ pathLength: progress, stroke: accent }} />
+          <motion.path d={ARC} fill="none" strokeWidth="17" strokeLinecap="round" opacity={0.14} style={{ pathLength: progress, stroke: accent }} />
+        </motion.g>
         <motion.path
           d={ARC}
           fill="none"
           strokeWidth="10"
           strokeLinecap="round"
           stroke={`url(#${id}-${over ? 'over' : 'ok'})`}
-          style={{ pathLength: progress, opacity: visible, filter: `drop-shadow(0 0 7px ${accent})` }}
+          style={{ pathLength: progress, opacity: visible }}
         />
         {/* Світна точка на кінці дуги */}
         <motion.circle r="12" cx={knobX} cy={knobY} style={{ opacity: glow, fill: accent }} />

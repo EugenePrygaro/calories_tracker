@@ -15,6 +15,7 @@ import '@fontsource/exo-2/latin-700.css'
 import './index.css'
 import App from './App.tsx'
 import { startAutoRefresh } from './data/store'
+import { prefetchSheets } from './features/lazySheets'
 import { applyTheme, readCachedTheme } from './lib/theme'
 
 // Тема — до першого рендеру, щоб не блимала стандартна
@@ -32,6 +33,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && updateReady) void updateSW(true)
 })
 startAutoRefresh()
+
+prefetchSheets()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

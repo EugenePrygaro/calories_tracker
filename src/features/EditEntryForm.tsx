@@ -4,6 +4,7 @@ import { LIMITS, type Entry } from '@shared/model.js'
 import { scale } from '@shared/nutrition.js'
 import { Button } from '@/components/ui/Button'
 import { Field, NumberField } from '@/components/ui/Field'
+import { GramsField } from '@/components/ui/GramsField'
 import { SheetFooter } from '@/components/ui/Modal'
 import { removeEntry, updateEntry, useEntry, type EntryPatch } from '@/data/store'
 import { grams, kcal, parseNum } from '@/lib/format'
@@ -66,7 +67,7 @@ function WeightEdit({ entry, per100, onDone }: { entry: Entry; per100: Entry['pe
           {grams(per100.carbs)}
         </p>
       </div>
-      <NumberField label="Вага порції" suffix="г" value={value} onChange={setValue} autoFocus />
+      <GramsField label="Вага порції" value={value} onChange={setValue} autoFocus />
       <NutrientsPreview value={scale(per100, valid ? g : 0)} />
       <Actions valid={valid} onDelete={() => remove(entry, onDone)} />
     </form>

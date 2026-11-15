@@ -6,7 +6,7 @@ import { sum } from '@shared/nutrition.js'
 import { portionCap, solvePortions, totalsOf } from '@shared/portion.js'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { NumberField } from '@/components/ui/Field'
-import { useDay, useFoods, useGoals } from '@/data/store'
+import { useDay, useFoods, useGoalsFor } from '@/data/store'
 import { cn } from '@/lib/cn'
 import { toDateKey } from '@/lib/date'
 import { grams as fmtGrams, int, parseNum } from '@/lib/format'
@@ -30,7 +30,7 @@ const field = (n: number) => (n > 0 ? String(Math.round(n)) : '')
  * кожної з вибраних страв узяти?» Розрахунок — shared/portion.js.
  */
 export function CalcSheet() {
-  const goals = useGoals()
+  const goals = useGoalsFor(toDateKey())
   const today = useDay(toDateKey())
   const foods = useFoods()
   const eaten = useMemo(() => sum(today.entries), [today.entries])

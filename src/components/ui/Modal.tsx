@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useDragControls, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useEffect, useId, type PointerEvent, type ReactNode } from 'react'
+import { useSheetFlag } from '@/lib/sheetFlag'
 import { useKeyboardInset, useViewportHeight } from '@/lib/viewport'
 import { IconButton } from './Button'
 
@@ -26,6 +27,7 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
   const y = useMotionValue<number | string>(0)
   const backdropOpacity = useTransform(y, (v) => (typeof v === 'number' ? Math.min(Math.max(1 - v / 320, 0), 1) : 1))
   const keyboard = useKeyboardInset()
+  useSheetFlag(open)
   const viewport = useViewportHeight()
 
   useEffect(() => {

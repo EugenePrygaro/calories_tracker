@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import {
   DEFAULT_GOALS,
@@ -12,6 +13,7 @@ import {
 } from '@shared/model.js'
 import { sanitizeBodyRecord, sanitizeEntry, sanitizeFood, sanitizeProfile } from '@shared/validate.js'
 import type { GameState } from '@shared/game.js'
+import { goalsForDate } from '@shared/goals.js'
 import type { DaySummary } from '@shared/stats.js'
 import type { ShopErrorCode, ShopItemId, UsableItemId } from '@shared/shop.js'
 import { toDateKey } from '@/lib/date'
@@ -19,7 +21,7 @@ import { haptic } from '@/lib/haptics'
 import type { AppTheme } from '@/lib/theme'
 import { useGameUi } from '@/store/gameUi'
 import { useUiStore } from '@/store/ui'
-import { ApiError, NetworkError, api, type GameAction, type GameResult } from './api'
+import { ApiError, NetworkError, api, type FoodUsage, type GameAction, type GameResult } from './api'
 
 /**
  * Дані з Redis на Vercel, які зараз показує UI.
@@ -49,6 +51,8 @@ interface DataState {
   /** «Мої страви», нещодавно змінені першими. */
   foods: Food[]
   foodsLoaded: boolean
+  /** id страви → скільки разів і коли востаннє додавали (для «Нещодавні» / «Часті») */
+  foodUsage: Record<string, FoodUsage>
   /** Заміри тіла, за датою від старих */
   body: BodyRecord[]
   bodyLoaded: boolean
@@ -65,6 +69,7 @@ export const useDataStore = create<DataState>()(() => ({
   profile: null,
   foods: [],
   foodsLoaded: false,
+  foodUsage: {},
   body: [],
   bodyLoaded: false,
   saving: 0,
@@ -73,6 +78,86 @@ export const useDataStore = create<DataState>()(() => ({
 }))
 
 const EMPTY_DAY: DayState = { entries: [], loaded: false, error: false, loadedAt: 0 }
+
+// ─── Знімок для миттєвого старту ─────────────────────────────────────────────
+
+/**
+ * Останні відомі дані в localStorage: при запуску головний екран малюється одразу
+ * (без скелетонів і очікування шести запитів), а свіжі дані підтягуються у фоні.
+ * Сьогоднішній день із знімка вважається застарілим (loadedAt: 0) — його однаково
+ * буде перезавантажено; знімок лише прибирає порожній екран на старті.
+ */
+const SNAPSHOT_KEY = 'ct:snapshot:v1'
+
+interface Snapshot {
+  profile: Profile | null
+  foods: Food[]
+  foodUsage?: Record<string, FoodUsage>
+  body: BodyRecord[]
+  game: GameState | null
+  stats: DaySummary[] | null
+  today: { date: string; entries: Entry[] } | null
+}
+
+function hydrateFromSnapshot(): void {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY)
+    if (!raw) return
+    const snap = JSON.parse(raw) as Partial<Snapshot>
+    const today = toDateKey()
+    useDataStore.setState({
+      profile: snap.profile ?? null,
+      ...(Array.isArray(snap.foods) ? { foods: snap.foods, foodsLoaded: true, foodUsage: snap.foodUsage ?? {} } : {}),
+      ...(Array.isArray(snap.body) ? { body: snap.body, bodyLoaded: true } : {}),
+      game: snap.game ?? null,
+      stats: Array.isArray(snap.stats) ? snap.stats : null,
+      days:
+        snap.today?.date === today && Array.isArray(snap.today.entries)
+          ? { [today]: { entries: snap.today.entries, loaded: true, error: false, loadedAt: 0 } }
+          : {},
+    })
+  } catch {
+    // зіпсований знімок — просто стартуємо з мережі
+  }
+}
+
+/** Записує знімок не частіше ніж раз на секунду і обов'язково, коли вкладку ховають. */
+function persistSnapshots(): void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const write = () => {
+    clearTimeout(timer)
+    timer = undefined
+    const s = useDataStore.getState()
+    const today = toDateKey()
+    const day = s.days[today]
+    const snap: Snapshot = {
+      profile: s.profile,
+      foods: s.foodsLoaded ? s.foods : [],
+      foodUsage: s.foodUsage,
+      body: s.bodyLoaded ? s.body : [],
+      game: s.game,
+      stats: s.stats,
+      today: day?.loaded && !day.error ? { date: today, entries: day.entries } : null,
+    }
+    try {
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap))
+    } catch {
+      // переповнено чи приватний режим — без знімка
+    }
+  }
+  useDataStore.subscribe((s, prev) => {
+    if (s.profile === prev.profile && s.foods === prev.foods && s.foodUsage === prev.foodUsage && s.body === prev.body && s.game === prev.game && s.stats === prev.stats && s.days === prev.days) return
+    timer ??= setTimeout(write, 1000)
+  })
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && timer) write()
+  })
+}
+
+if (typeof window !== 'undefined') {
+  hydrateFromSnapshot()
+  persistSnapshots()
+}
 const byCreated = (a: Entry, b: Entry) => a.createdAt - b.createdAt
 
 // ─── Черга змін і безпечні завантаження ──────────────────────────────────────
@@ -209,11 +294,19 @@ function applyEntryResponse(res: { applied: boolean; entry: Entry; game?: GameRe
   if (res.game) applyGameResult(res.game)
 }
 
-export async function addEntry(draft: EntryDraft): Promise<void> {
+/** @param opts.foodId запис додано з «Моїх страв» — рахується для «Нещодавні» / «Часті» */
+export async function addEntry(draft: EntryDraft, opts: { foodId?: string } = {}): Promise<void> {
   const entry = buildEntry(draft)
   mutateDay(entry.date, (es) => [...es, entry])
+  if (opts.foodId) {
+    const id = opts.foodId
+    useDataStore.setState((s) => {
+      const prev = s.foodUsage[id]
+      return { foodUsage: { ...s.foodUsage, [id]: { n: (prev?.n ?? 0) + 1, last: entry.createdAt } } }
+    })
+  }
   const res = await save(
-    () => api.putEntry(entry),
+    () => api.putEntry(entry, undefined, opts.foodId),
     () => mutateDay(entry.date, (es) => es.filter((e) => e.id !== entry.id)),
   )
   applyEntryResponse(res)
@@ -305,6 +398,8 @@ interface ProfileInput {
   goals: Record<keyof Goals, string | number>
   /** Порожньо — ціль не задана */
   targetWeight: string | number
+  /** На скільки % більше калорій на вихідних */
+  weekendBoost: string | number
 }
 
 export async function saveProfile(input: ProfileInput): Promise<void> {
@@ -312,6 +407,7 @@ export async function saveProfile(input: ProfileInput): Promise<void> {
   const profile: Profile = sanitizeProfile({
     goals: input.goals,
     targetWeight: input.targetWeight,
+    weekendBoost: input.weekendBoost,
     updatedAt: Math.max(Date.now(), (prev?.updatedAt ?? 0) + 1),
   })
   useDataStore.setState({ profile })
@@ -502,7 +598,14 @@ export const useDay = (date: string): DayState => useDataStore((s) => s.days[dat
 export const useEntry = (date: string, id: string): Entry | undefined =>
   useDataStore((s) => s.days[date]?.entries.find((e) => e.id === id))
 
+/** Базові норми з профілю (як їх задав користувач, без надбавки на вихідні). */
 export const useGoals = (): Goals => useDataStore((s) => s.profile?.goals) ?? DEFAULT_GOALS
+
+/** Норма на конкретну дату: на вихідних калорій більше (shared/goals.js). */
+export function useGoalsFor(date: string): Goals {
+  const profile = useDataStore((s) => s.profile)
+  return useMemo(() => goalsForDate(profile, date), [profile, date])
+}
 
 export const useFoods = (): Food[] => useDataStore((s) => s.foods)
 
@@ -547,7 +650,7 @@ export function startAutoRefresh(): () => void {
 
     void loadDay(useUiStore.getState().selectedDate)
     void guardedLoad(api.getProfile, ({ profile }) => useDataStore.setState({ profile })).catch(() => {})
-    void guardedLoad(api.getFoods, ({ foods }) => useDataStore.setState({ foods, foodsLoaded: true })).catch(() => {})
+    void guardedLoad(api.getFoods, ({ foods, usage }) => useDataStore.setState({ foods, foodsLoaded: true, foodUsage: usage ?? {} })).catch(() => {})
     void guardedLoad(api.getBody, ({ records }) => useDataStore.setState({ body: records, bodyLoaded: true })).catch(() => {})
     void guardedLoad(api.getGame, ({ game }) => useDataStore.setState({ game: withPendingSeen(game) })).catch(() => {})
     void loadStats()

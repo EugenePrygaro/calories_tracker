@@ -58,7 +58,8 @@
 
 /**
  * Профіль: денні норми й цільова вага (кг, null — не задана).
- * @typedef {{ goals: Goals, targetWeight: number | null, updatedAt: number }} Profile
+ * weekendBoost — на скільки % більше калорій у суботу й неділю (0 — вимкнено), див. shared/goals.js
+ * @typedef {{ goals: Goals, targetWeight: number | null, weekendBoost: number, updatedAt: number }} Profile
  */
 
 /** @typedef {'weight' | 'chest' | 'waist' | 'hips'} BodyField */
@@ -111,6 +112,7 @@ export const LIMITS = {
   per100: { kcal: 1000, macro: 100 },
   quick: { kcal: 10000, macro: 1000 },
   goals: { kcal: { min: 500, max: 10000 }, macro: { min: 0, max: 1000 } },
+  weekendBoost: { min: 0, max: 50 },
   body: { weight: { min: 20, max: 400 }, cm: { min: 20, max: 300 } },
 }
 

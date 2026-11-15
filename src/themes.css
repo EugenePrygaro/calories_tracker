@@ -4,21 +4,102 @@
  * <html data-theme="…"> (src/lib/theme.ts), фонові ефекти малює ThemeEffects.
  */
 
-/* ── Новорічна: хвоя, золоті рамки, сніг ── */
+/* ── Новорічна (зимова): морозна синя гама, крижані рамки, сніг ── */
 :root[data-theme='newyear'] {
-  --bg-main: #07130e;
-  --bg-glow: #1e3d2d;
-  --bg-card: #0e1e17;
-  --bg-elevated: #15302a;
-  --border: rgb(226 186 92 / 0.3);
-  --glass-from: rgb(255 240 200 / 0.06);
+  --bg-main: #08111f;
+  --bg-glow: #1d3558;
+  --bg-card: #0e1a2d;
+  --bg-elevated: #15243c;
+  --border: rgb(150 195 255 / 0.2);
+  --glass-from: rgb(190 220 255 / 0.07);
   --glass-to: rgb(255 255 255 / 0.015);
-  --glass-highlight: rgb(240 200 110 / 0.22);
-  --text-muted: #93a99c;
-  --accent-primary: #2fae6b;
-  --accent-primary-deep: #0b5632;
-  --accent-secondary: #e8c96d;
+  --glass-highlight: rgb(190 225 255 / 0.2);
+  --text-main: #eaf2ff;
+  --text-muted: #8fa3bf;
+  --accent-primary: #4ea8ff;
+  --accent-primary-deep: #1f57b8;
+  --accent-secondary: #a8d8ff;
+  --accent-protein: #7cc4ff;
+  --shield: #b3e1ff;
   --coin: #f2cb5a;
+}
+
+/* Новорічні прикраси: шапка трохи нижча — над нею гірлянда */
+:root[data-theme='newyear'] [data-app-header] {
+  padding-top: calc(env(safe-area-inset-top) + 1.75rem);
+}
+
+/* Снігові шапки на картках головного екрана (не в шторках і не на плаваючих кнопках) */
+:root[data-theme='newyear'] .card.rounded-3xl:not(.fixed):not([role='dialog'] *) {
+  position: relative;
+}
+:root[data-theme='newyear'] .card.rounded-3xl:not(.fixed):not([role='dialog'] *)::before {
+  /* Сніг лежить НА краю картки: рівна основа на рамці, кучугурки ростуть угору.
+     Два шари кучугур із різним кроком — нерівний, природний край. До кутів сніг
+     сходить нанівець (маска), тож на заокругленні немає різкого обрізу. */
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: -9px;
+  left: 14px;
+  right: 14px;
+  height: 13px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 21px 10px at 21px 13px, #f3f8ff 97%, transparent 100%) 0 0 / 42px 13px repeat-x,
+    radial-gradient(ellipse 14px 7px at 14px 13px, #e4f0ff 97%, transparent 100%) 23px 0 / 58px 13px repeat-x,
+    linear-gradient(#eef5ff, #dcebff) 0 100% / 100% 4px no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+  filter: drop-shadow(0 1px 0.5px rgb(0 10 30 / 0.35));
+}
+
+/* Гірлянда: над шапкою, на всю ширину */
+.fx-garland {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  height: 34px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fx-bulb {
+  animation: fx-twinkle 2.6s ease-in-out infinite;
+}
+@keyframes fx-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Ялинкові кульки по краях — гойдаються на ниточці */
+.fx-bauble {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 6px);
+  z-index: 26;
+  pointer-events: none;
+  transform-origin: 50% 0;
+  animation: fx-swing 3.4s ease-in-out infinite alternate;
+}
+.fx-bauble-left {
+  left: 0;
+}
+.fx-bauble-right {
+  right: 0;
+}
+@keyframes fx-swing {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(7deg);
+  }
 }
 
 /* ── Геловінська: гарбузовий неон на фіолетовому ── */
@@ -301,11 +382,11 @@
 }
 
 /* Ефекти не крутяться, поки відкрита шторка, і зовсім вимкнені при «менше руху» */
-body:has([role='dialog']) :is(.fx-fall, .fx-rise, .fx-grid) {
+:root[data-sheet] :is(.fx-fall, .fx-rise, .fx-grid, .fx-bulb, .fx-bauble) {
   animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
-  :is(.fx-fall, .fx-rise, .fx-grid) {
+  :is(.fx-fall, .fx-rise, .fx-grid, .fx-bulb, .fx-bauble) {
     animation: none;
   }
 }

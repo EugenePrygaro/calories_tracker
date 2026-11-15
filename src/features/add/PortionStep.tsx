@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { LIMITS, type FoodItem, type MealType } from '@shared/model.js'
 import { scale } from '@shared/nutrition.js'
 import { Button } from '@/components/ui/Button'
-import { NumberField } from '@/components/ui/Field'
+import { GramsField } from '@/components/ui/GramsField'
 import { SheetFooter } from '@/components/ui/Modal'
 import { Switch } from '@/components/ui/Switch'
 import { addEntry, saveFood, useFoods } from '@/data/store'
@@ -35,7 +35,7 @@ export function PortionStep({ item, meal, onDone }: PortionStepProps) {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!valid) return
-    void addEntry({ mode: 'weight', date, meal, name: item.name, grams: g, per100: p }).catch(() => {})
+    void addEntry({ mode: 'weight', date, meal, name: item.name, grams: g, per100: p }, { foodId: item.id }).catch(() => {})
     // Порцію запам'ятовуємо як типову — наступного разу підставиться сама.
     if (saveToMine && !alreadySaved) void saveFood({ ...item, servingGrams: g }).catch(() => {})
     onDone()
@@ -54,7 +54,7 @@ export function PortionStep({ item, meal, onDone }: PortionStepProps) {
         </div>
       </div>
 
-      <NumberField label="Скільки з’їли" suffix="г" value={value} onChange={setValue} autoFocus />
+      <GramsField label="Скільки з’їли" value={value} onChange={setValue} autoFocus />
 
       <div className="-mt-2 flex flex-wrap gap-2">
         {presets.map((n) => (

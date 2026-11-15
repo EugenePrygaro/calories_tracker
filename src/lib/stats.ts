@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
+import { goalsForDate } from '@shared/goals.js'
 import { deficitOf, summarize, type DaySummary } from '@shared/stats.js'
-import { useDataStore, useGoals } from '@/data/store'
+import { useDataStore, useGame } from '@/data/store'
 import { addDays } from '@/lib/date'
 
 /**
@@ -10,17 +11,23 @@ import { addDays } from '@/lib/date'
 export function useDaySummaries(): Map<string, DaySummary> {
   const stats = useDataStore((s) => s.stats)
   const days = useDataStore((s) => s.days)
-  const goals = useGoals()
+  const profile = useDataStore((s) => s.profile)
+  const cheatDays = useGame()?.cheatDays
   return useMemo(() => {
     const map = new Map((stats ?? []).map((d) => [d.date, d]))
     for (const [date, day] of Object.entries(days)) {
       if (!day.loaded || day.error) continue
       if (day.entries.length === 0) map.delete(date)
       // цілі дня — зі знімка сервера, якщо він є (історія не переписується новими нормами)
-      else map.set(date, summarize(date, day.entries, map.get(date)?.goals ?? goals))
+      else map.set(date, summarize(date, day.entries, map.get(date)?.goals ?? goalsForDate(profile, date)))
+    }
+    // дні з читмілом — успішні (див. accuracy)
+    for (const date of cheatDays ?? []) {
+      const s = map.get(date)
+      if (s) map.set(date, { ...s, cheat: true })
     }
     return map
-  }, [stats, days, goals])
+  }, [stats, days, profile, cheatDays])
 }
 
 /** Дати від from до to включно. */

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Flame, Lock, Sparkles } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Flame, Lock, PartyPopper, Sparkles } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import {
   ACHIEVEMENTS,
@@ -21,12 +21,18 @@ import { claimableAchievements } from './useClaimableCount'
 import { GROUP_ORDER, GROUPS, TIERS } from './achievementStyle'
 
 type Filter = AchievementGroup | 'all'
+/** open — ще не отримані (з прогресом і «Забрати»), claimed — список уже отриманих */
+type View = 'open' | 'claimed'
 
-/** Вітрина досягнень: категорії, прогрес і кнопка «Забрати нагороду». */
+/**
+ * Вітрина досягнень: лише ще не отримані — з прогресом і кнопкою «Забрати нагороду».
+ * Отримані — окремим списком за тапом на плашку «Отримано».
+ */
 export function AchievementsSheet() {
   const game = useGame()
   const foods = useFoods()
   const [filter, setFilter] = useState<Filter>('all')
+  const [view, setView] = useState<View>('open')
   if (!game) return <p className="py-10 text-center text-sm text-muted">Завантаження…</p>
 
   const stats = statsOf(game, foods.filter((f) => f.source === 'own').length)
@@ -36,9 +42,33 @@ export function AchievementsSheet() {
     group === 'all' ? claimable.length : claimable.filter((a) => a.group === group).length
   const groups = filter === 'all' ? GROUP_ORDER : [filter]
 
+  if (view === 'claimed') {
+    return (
+      <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col gap-4 pb-4">
+        <button
+          type="button"
+          onClick={() => setView('open')}
+          className="flex items-center gap-1 self-start rounded-full bg-white/[0.05] py-2 pr-4 pl-2.5 text-sm font-bold active:bg-white/10"
+        >
+          <ChevronLeft className="size-4" /> Не отримані
+        </button>
+        <h3 className="flex items-center gap-2 text-sm font-bold">
+          <Sparkles className="size-4 text-primary" /> Отримано {claimedCount} з {ACHIEVEMENTS.length}
+        </h3>
+        {claimedCount === 0 ? (
+          <p className="rounded-2xl bg-white/[0.03] px-4 py-8 text-center text-sm text-muted">Ще жодного — усе попереду!</p>
+        ) : (
+          GROUP_ORDER.map((group) => <Category key={group} group={group} stats={stats} game={game} mode="claimed" />)
+        )}
+      </motion.div>
+    )
+  }
+
+  const left = ACHIEVEMENTS.filter((a) => !(a.id in game.claimed) && (filter === 'all' || a.group === filter)).length
+
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <Summary game={game} claimed={claimedCount} />
+      <Summary game={game} claimed={claimedCount} onClaimed={() => setView('claimed')} />
 
       {/* Фільтр за категоріями */}
       <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
@@ -56,15 +86,23 @@ export function AchievementsSheet() {
       </div>
 
       {groups.map((group) => (
-        <Category key={group} group={group} stats={stats} game={game} />
+        <Category key={group} group={group} stats={stats} game={game} mode="open" />
       ))}
+      {left === 0 && (
+        <p className="flex flex-col items-center gap-2 rounded-2xl bg-white/[0.03] px-4 py-8 text-center text-sm text-muted">
+          <PartyPopper className="size-6 text-primary" />
+          Тут усе отримано — загляньте в «Отримано»
+        </p>
+      )}
     </div>
   )
 }
 
-function Category({ group, stats, game }: { group: AchievementGroup; stats: AchievementStats; game: GameState }) {
-  const items = ACHIEVEMENTS.filter((a) => a.group === group)
-  const done = items.filter((a) => a.id in game.claimed).length
+function Category({ group, stats, game, mode }: { group: AchievementGroup; stats: AchievementStats; game: GameState; mode: View }) {
+  const all = ACHIEVEMENTS.filter((a) => a.group === group)
+  const done = all.filter((a) => a.id in game.claimed).length
+  const items = all.filter((a) => (a.id in game.claimed) === (mode === 'claimed'))
+  if (items.length === 0) return null
   const g = GROUPS[group]
   const Icon = g.icon
   return (
@@ -73,7 +111,7 @@ function Category({ group, stats, game }: { group: AchievementGroup; stats: Achi
         <Icon className="size-4" style={{ color: g.color }} />
         {g.title}
         <span className="ml-auto font-normal normal-case">
-          {done} / {items.length}
+          {done} / {all.length}
         </span>
       </h3>
       {items.map((a, i) => (
@@ -101,10 +139,27 @@ function FilterChip({ active, onClick, badge, children }: { active: boolean; onC
   )
 }
 
-function Summary({ game, claimed }: { game: GameState; claimed: number }) {
+function Summary({ game, claimed, onClaimed }: { game: GameState; claimed: number; onClaimed: () => void }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <SummaryTile label="Отримано" value={`${claimed} / ${ACHIEVEMENTS.length}`} icon={<Sparkles className="size-4 text-primary" />} />
+      {/* «Отримано» — кнопка: відкриває список уже отриманих досягнень */}
+      <motion.button
+        type="button"
+        onClick={onClaimed}
+        whileTap={{ scale: 0.96 }}
+        aria-label={`Отримано ${claimed} з ${ACHIEVEMENTS.length}: показати отримані`}
+        className="card flex items-center gap-1 rounded-2xl px-3 py-2.5 text-left ring-1 ring-inset ring-primary/25"
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex items-center gap-1 text-[11px] text-muted">
+            <Sparkles className="size-4 text-primary" /> Отримано
+          </span>
+          <span className="text-base font-bold">
+            {claimed} / {ACHIEVEMENTS.length}
+          </span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-primary" />
+      </motion.button>
       <SummaryTile label="Рекорд серії" value={`${game.bestStreak} дн.`} icon={<Flame className="size-4 text-streak" />} />
     </div>
   )

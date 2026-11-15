@@ -1,12 +1,13 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion'
 import { Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { MEAL_LABELS, type Entry, type MealType } from '@shared/model.js'
 import { sum } from '@shared/nutrition.js'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { IconButton } from '@/components/ui/Button'
 import { removeEntry } from '@/data/store'
 import { cn } from '@/lib/cn'
+import { haptic } from '@/lib/haptics'
 import { grams, kcal, macrosLine } from '@/lib/format'
 import { useUiStore } from '@/store/ui'
 import { MEAL_ICONS } from './mealIcons'
@@ -76,8 +77,20 @@ export function MealSection({ meal, entries }: MealSectionProps) {
   )
 }
 
+/** Наскільки потягнути рядок уліво, щоб видалити (або швидкий змах). */
+const DELETE_DISTANCE = 96
+
+/**
+ * Рядок запису. Видалення — свайпом уліво (смітник у кожному рядку легко було зачепити);
+ * ще можна видалити з форми редагування. Скасувати — кнопкою «Повернути» в тості.
+ */
 function EntryRow({ entry }: { entry: Entry }) {
   const openModal = useUiStore((s) => s.openModal)
+  const x = useMotionValue(0)
+  // червона підкладка росте з правого краю рівно на відстань, на яку зсунули рядок
+  const reveal = useTransform(x, (v) => Math.max(-v, 0))
+  const armed = useTransform(x, (v) => (v > -2 ? 0 : v <= -DELETE_DISTANCE ? 1 : 0.55))
+  const dragged = useRef(false)
 
   return (
     <motion.li
@@ -86,12 +99,42 @@ function EntryRow({ entry }: { entry: Entry }) {
       animate={{ opacity: 1, height: 'auto' }}
       exit={{ opacity: 0, height: 0, x: -24 }}
       transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-      className="overflow-hidden"
+      className="relative overflow-hidden"
     >
-      <div className="flex items-center gap-1 py-1 pr-2 pl-2">
+      <motion.div
+        aria-hidden
+        // без padding: інакше підкладка шириною 0 однаково лишала б смужку
+        className="absolute inset-y-0 right-0 overflow-hidden bg-danger text-white"
+        style={{ width: reveal, opacity: armed }}
+      >
+        <Trash2 className="absolute top-1/2 right-5 size-5 -translate-y-1/2" />
+      </motion.div>
+      <motion.div
+        data-row-swipe
+        drag="x"
+        dragDirectionLock
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={{ left: 0.9, right: 0 }}
+        style={{ x }}
+        onDragStart={() => {
+          dragged.current = true
+        }}
+        onDrag={(_, info) => {
+          // легкий відгук, коли свайп «зведено»
+          if (info.offset.x <= -DELETE_DISTANCE && x.getPrevious()! > -DELETE_DISTANCE) haptic(8)
+        }}
+        onDragEnd={(_, info) => {
+          if (info.offset.x <= -DELETE_DISTANCE || info.velocity.x < -700) removeEntry(entry)
+          setTimeout(() => (dragged.current = false), 0)
+        }}
+        className="relative flex items-center py-1 pr-3 pl-2"
+      >
         <button
           type="button"
-          onClick={() => openModal({ type: 'edit', date: entry.date, entryId: entry.id })}
+          onClick={() => {
+            if (!dragged.current) openModal({ type: 'edit', date: entry.date, entryId: entry.id })
+          }}
+          aria-label={`${entry.name}, ${kcal(entry.kcal)} ккал. Змахніть уліво, щоб видалити`}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors active:bg-white/[0.05]"
         >
           <div className="min-w-0 flex-1">
@@ -103,10 +146,7 @@ function EntryRow({ entry }: { entry: Entry }) {
           </div>
           <span className="shrink-0 text-sm font-semibold">{kcal(entry.kcal)}</span>
         </button>
-        <IconButton label={`Видалити «${entry.name}»`} onClick={() => removeEntry(entry)} className="active:text-danger">
-          <Trash2 className="size-4" />
-        </IconButton>
-      </div>
+      </motion.div>
     </motion.li>
   )
 }

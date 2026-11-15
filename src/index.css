@@ -178,8 +178,8 @@
   }
 }
 
-/* Поки відкрита шторка, бліки на головній під нею не крутимо (їх не видно — лише батарея) */
-body:has([role='dialog']) :is(.bar-gloss, .sheen):not([role='dialog'] *)::after {
+/* Поки відкрита шторка (html[data-sheet], див. lib/sheetFlag), бліки на головній під нею не крутимо */
+:root[data-sheet] :is(.bar-gloss, .sheen):not([role='dialog'] *)::after {
   animation-play-state: paused;
 }
 

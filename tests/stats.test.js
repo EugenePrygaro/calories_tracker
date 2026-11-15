@@ -18,12 +18,18 @@ test('точність: 100% у нормі, 10% відхилення скріз�
   assert.equal(accuracy(day({ kcal: 9000, protein: 999, fat: 999, carbs: 999 })), 0)
 })
 
+test('день із читмілом — точний, навіть із перебором', () => {
+  assert.equal(accuracy(day({ kcal: 4000, cheat: true })), 1)
+  assert.equal(heatLevel(day({ kcal: 4000, cheat: true })), 4)
+})
+
 test('рівень теплової карти: 0 без записів, далі 1…4 за точністю', () => {
   assert.equal(heatLevel(undefined), 0)
   assert.equal(heatLevel(day({ entries: 0 })), 0)
   assert.equal(heatLevel(day()), 4)
   assert.equal(heatLevel(day({ kcal: 2300, protein: 100, fat: 80, carbs: 260 })), 3) // ~15%
-  assert.equal(heatLevel(day({ kcal: 1400, protein: 60, fat: 40, carbs: 150 })), 1)
+  assert.equal(heatLevel(day({ kcal: 1400, protein: 60, fat: 40, carbs: 150 })), 2) // ~62%
+  assert.equal(heatLevel(day({ kcal: 1000, protein: 40, fat: 30, carbs: 100 })), 1) // ~44%
 })
 
 test('дефіцит: норма − з’їдене', () => {
@@ -153,4 +159,47 @@ test('loadSummaries: уперше будує підсумки з усіх ная
   assert.equal((await loadSummaries(r)).length, 2)
   await refreshDaySummary(r, '2026-11-04')
   assert.equal((await loadSummaries(r)).length, 3)
+})
+
+// ─── «Нещодавні» й «Часті» ───────────────────────────────────────────────────
+
+test('лічильники страв: будуються з історії за назвою, далі — при додаванні зі страви', async () => {
+  const { loadUsage, recordUsage } = await import('../server/usage.js')
+  const r = new MemoryRedis()
+  const food = { id: 'food-0001', name: 'Гречка варена', brand: null, per100: RICE, servingGrams: 200, source: 'own', offCode: null, createdAt: 1, updatedAt: 1 }
+  await r.hset(KEYS.foods, { [food.id]: food })
+  const e = (id, date, at) => ({ id, date, meal: 'lunch', mode: 'weight', name: 'гречка варена ', grams: 200, per100: RICE, createdAt: at, updatedAt: at })
+  await r.hset(KEYS.day('2026-11-01'), { 'entry-0001': e('entry-0001', '2026-11-01', 100) })
+  await r.hset(KEYS.day('2026-11-02'), { 'entry-0002': e('entry-0002', '2026-11-02', 200) })
+  assert.deepEqual(await loadUsage(r), { 'food-0001': { n: 2, last: 200 } })
+  await recordUsage(r, 'food-0001', 300)
+  assert.deepEqual(await loadUsage(r), { 'food-0001': { n: 3, last: 300 } })
+})
+
+// ─── Норма на вихідних ───────────────────────────────────────────────────────
+
+test('вихідні: калорій більше на weekendBoost % (за замовчуванням 15%), БЖВ ті самі', async () => {
+  const { goalsForDate, isWeekend } = await import('../shared/goals.js')
+  const profile = { goals: GOALS, weekendBoost: 15 }
+  assert.equal(isWeekend('2026-11-14'), true) // субота
+  assert.equal(isWeekend('2026-11-16'), false) // понеділок
+  assert.deepEqual(goalsForDate(profile, '2026-11-15'), { ...GOALS, kcal: 2300 })
+  assert.deepEqual(goalsForDate(profile, '2026-11-16'), GOALS)
+  assert.deepEqual(goalsForDate({ goals: GOALS, weekendBoost: 0 }, '2026-11-15'), GOALS)
+  assert.equal(goalsForDate(null, '2026-11-15').kcal, 2300) // без профілю — норми за замовчуванням +15%
+})
+
+test('вихідні: нагорода за норму й підсумок дня рахуються від збільшеної норми', async () => {
+  const r = new MemoryRedis()
+  setRedisClient(r)
+  await r.set(KEYS.profile, { goals: GOALS, targetWeight: null, weekendBoost: 15, updatedAt: 1 })
+  const now = Date.now()
+  const today = new Date(now)
+  // запис на сьогодні (нагороди лише за сьогодні/вчора); очікувана норма залежить від дня тижня
+  const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const entry = { id: 'entry-weekend', date: key, meal: 'lunch', mode: 'quick', name: 'Обід', kcal: 2300, protein: 0, fat: 0, carbs: 0, createdAt: now, updatedAt: now }
+  await call(entries, 'PUT', '/api/entries?id=entry-weekend', { entry })
+  const summary = (await r.hgetall(KEYS.summary))?.[key]
+  const { isWeekend } = await import('../shared/goals.js')
+  assert.equal(summary?.goals.kcal, isWeekend(key) ? 2300 : 2000)
 })

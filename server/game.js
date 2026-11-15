@@ -1,7 +1,8 @@
 /**
  * Стан гри в Redis (ct:game) і серверні сценарії: запис їжі → нагороди, dev-дії.
  */
-import { DATE_RE, DEFAULT_GOALS, MEAL_TYPES } from '../shared/model.js'
+import { DATE_RE, MEAL_TYPES } from '../shared/model.js'
+import { goalsForDate } from '../shared/goals.js'
 import { sum } from '../shared/nutrition.js'
 import { BASE_SHIELD_SLOTS, COUNTER_KEYS, dayDiff, grant, isNearToday, localToday, newDayAwards, newGameState, onEntrySaved, trackHoldings } from '../shared/game.js'
 import { ID_ALIASES, isAchievementId } from '../shared/achievements.js'
@@ -48,6 +49,7 @@ export function sanitizeGame(input) {
   const lost = obj(o.lostStreak)
   const lostDate = dateOrNull(lost.date)
   for (const [id, at] of Object.entries(obj(o.themes))) if (isThemeId(id)) s.themes[id] = count(at)
+  s.cheatDays = (Array.isArray(o.cheatDays) ? o.cheatDays : []).filter((d) => typeof d === 'string' && DATE_RE.test(d)).slice(-400)
   s.activeTheme = isThemeId(o.activeTheme) && o.activeTheme in s.themes ? o.activeTheme : DEFAULT_THEME
   s.lostStreak = lostDate ? { value: count(lost.value, 100_000), weeksPaid: count(lost.weeksPaid, 100_000), date: lostDate } : null
   s.proteinStreak = count(o.proteinStreak, 100_000)
@@ -132,12 +134,15 @@ export async function processEntrySaved(r, entry, existing, opts, now = Date.now
     .map(storedEntry)
     .filter((e) => e !== null)
 
-  let goals = DEFAULT_GOALS
+  /** @type {import('../shared/model.js').Profile | null} */
+  let profile = null
   try {
-    goals = sanitizeProfile(parseStored(rawProfile)).goals
+    profile = sanitizeProfile(parseStored(rawProfile))
   } catch {
     // профілю ще немає — цілі за замовчуванням
   }
+  // норма саме на дату запису (на вихідних калорій більше)
+  const goals = goalsForDate(profile, entry.date)
 
   const events = onEntrySaved(
     state,

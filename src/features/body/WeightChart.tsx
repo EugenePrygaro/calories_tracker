@@ -150,13 +150,26 @@ export function WeightChart({ points, target, height = 200 }: WeightChartProps) 
 
           <motion.path key={`a-${drawKey}`} d={area} fill={`url(#${id}-area)`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }} />
           <motion.path
+            key={`g-${drawKey}`}
+            d={line}
+            fill="none"
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={0.16}
+            style={{ stroke: 'var(--accent-primary)' }}
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.9, ease: 'easeInOut' }}
+          />
+          <motion.path
             key={`l-${drawKey}`}
             d={line}
             fill="none"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ stroke: 'var(--accent-primary)', filter: 'drop-shadow(0 0 4px var(--accent-primary))' }}
+            style={{ stroke: 'var(--accent-primary)' }}
             initial={{ pathLength: 0 }}
             animate={{ pathLength: 1 }}
             transition={{ duration: 0.9, ease: 'easeInOut' }}

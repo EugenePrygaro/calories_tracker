@@ -1,6 +1,7 @@
 /**
  * «Мої страви» — особистий каталог.
- * GET    /api/foods             → { foods: Food[] } (нещодавно змінені першими)
+ * GET    /api/foods             → { foods: Food[], usage } (нещодавно змінені першими;
+ *                                  usage — id → { n, last } для «Нещодавні» / «Часті»)
  * PUT    /api/foods?id=… {food} → { applied, food }  (перемагає більший updatedAt)
  * DELETE /api/foods?id=…        → { ok }
  *
@@ -9,6 +10,7 @@
  */
 import { handler, HttpError, query, readJson, send } from '../server/http.js'
 import { KEYS, parseStored, redis } from '../server/store.js'
+import { loadUsage } from '../server/usage.js'
 import { requireId, sanitizeFood } from '../shared/validate.js'
 
 /** @param {unknown} value */
@@ -29,7 +31,7 @@ export default handler(['GET', 'PUT', 'DELETE'], async (req, res) => {
       .map(storedFood)
       .filter((f) => f !== null)
       .sort((a, b) => b.updatedAt - a.updatedAt)
-    return send(res, 200, { foods })
+    return send(res, 200, { foods, usage: await loadUsage(r) })
   }
 
   const id = requireId(query(req, 'id'))

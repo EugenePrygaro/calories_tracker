@@ -12,6 +12,7 @@ export type Modal =
   | { type: 'shop' }
   | { type: 'stats' }
   | { type: 'calc' }
+  | { type: 'calendar' }
 
 interface Toast {
   id: number
@@ -36,6 +37,8 @@ interface UiState {
 
   shiftDate: (days: number) => void
   goToday: () => void
+  /** Перейти на конкретну дату (календар) */
+  selectDate: (date: DateKey) => void
   openModal: (modal: Modal) => void
   closeModal: () => void
   showToast: (message: string, opts?: ToastOptions) => void
@@ -52,6 +55,7 @@ export const useUiStore = create<UiState>()((set) => ({
 
   shiftDate: (days) =>
     set((s) => ({ selectedDate: addDays(s.selectedDate, days), direction: days < 0 ? -1 : 1 })),
+  selectDate: (date) => set((s) => ({ selectedDate: date, direction: date < s.selectedDate ? -1 : 1 })),
   goToday: () =>
     set((s) => {
       const today = toDateKey()

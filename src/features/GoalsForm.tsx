@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import type { Goals } from '@shared/model.js'
+import { DEFAULT_WEEKEND_BOOST } from '@shared/goals.js'
 import { kcalFromMacros } from '@shared/nutrition.js'
 import { sanitizeProfile } from '@shared/validate.js'
 import { Button } from '@/components/ui/Button'
@@ -34,11 +35,12 @@ function GoalsFormInner({ onDone }: { onDone: () => void }) {
     carbs: String(goals.carbs),
   })
   const [targetWeight, setTargetWeight] = useState(target === null ? '' : String(target).replace('.', ','))
+  const [weekendBoost, setWeekendBoost] = useState(String(useDataStore.getState().profile?.weekendBoost ?? DEFAULT_WEEKEND_BOOST))
   const set = (k: keyof GoalsInput) => (v: string) => setF((s) => ({ ...s, [k]: v }))
 
   let valid = true
   try {
-    sanitizeProfile({ goals: f, targetWeight, updatedAt: 1 })
+    sanitizeProfile({ goals: f, targetWeight, weekendBoost, updatedAt: 1 })
   } catch {
     valid = false
   }
@@ -51,7 +53,7 @@ function GoalsFormInner({ onDone }: { onDone: () => void }) {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!valid) return
-    void saveProfile({ goals: f, targetWeight }).catch(() => {}) // помилку покаже тост, профіль відкотиться
+    void saveProfile({ goals: f, targetWeight, weekendBoost }).catch(() => {}) // помилку покаже тост, профіль відкотиться
     onDone()
   }
 
@@ -70,6 +72,15 @@ function GoalsFormInner({ onDone }: { onDone: () => void }) {
         <p className="text-xs text-muted">
           За БЖВ виходить ≈ <b className="text-fg">{kcal(fromMacros)} ккал</b>
         </p>
+        <NumberField
+          label="На вихідних калорій більше на"
+          hint={weekendPreview(f.kcal, weekendBoost)}
+          suffix="%"
+          inputMode="numeric"
+          value={weekendBoost}
+          onChange={setWeekendBoost}
+          placeholder="0"
+        />
       </Group>
 
       <Group title="Вага">
@@ -90,6 +101,14 @@ function GoalsFormInner({ onDone }: { onDone: () => void }) {
       </SheetFooter>
     </form>
   )
+}
+
+/** Підказка біля поля: «сб–нд: 2 300 ккал» (або «вимкнено»). */
+function weekendPreview(kcalStr: string, boostStr: string): string {
+  const base = parseNum(kcalStr) ?? 0
+  const boost = parseNum(boostStr) ?? 0
+  if (!(boost > 0) || !(base > 0)) return 'вимкнено'
+  return `сб–нд: ${kcal(Math.round((base * (1 + boost / 100)) / 10) * 10)} ккал`
 }
 
 function Group({ title, children }: { title: string; children: ReactNode }) {

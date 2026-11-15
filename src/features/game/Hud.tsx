@@ -36,13 +36,14 @@ export function Hud() {
         }
       >
         <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-main/70 ring-1 ring-inset ring-coin/40 [perspective:200px]">
+          {/* сяйво — статичне (drop-shadow на монеті, що крутиться, перемальовувався б щокадру) */}
+          <span aria-hidden className="absolute inset-2 rounded-full bg-coin/35 blur-[7px]" />
           <motion.span
             key={coins} // монета перевертається, щойно баланс змінився
             initial={{ rotateY: 0, scale: 1 }}
             animate={{ rotateY: [0, 360], scale: [1, 1.18, 1] }}
             transition={{ duration: 0.7, ease: 'easeOut' }}
-            className="flex text-coin"
-            style={{ filter: 'drop-shadow(0 0 6px var(--coin))' }}
+            className="relative flex text-coin"
           >
             <CoinIcon className="size-6" />
           </motion.span>

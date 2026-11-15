@@ -68,11 +68,14 @@ interface ViewProps {
   today: string
   selected: string | null
   onSelect: (date: string) => void
+  /** з якого місяця почати (за замовчуванням — поточний) */
+  initial?: string
 }
 
-function MonthView({ map, today, selected, onSelect }: ViewProps) {
+/** Місяць календарем; спільний для теплової карти й календаря за тапом на дату. */
+export function MonthView({ map, today, selected, onSelect, initial }: ViewProps) {
   const thisMonth = today.slice(0, 8) + '01'
-  const [first, setFirst] = useState(thisMonth)
+  const [first, setFirst] = useState(() => (initial ?? today).slice(0, 8) + '01')
   const [dir, setDir] = useState(0)
   const last = addDays(shiftMonth(first, 1), -1)
   const days = dateRange(first, last)
@@ -244,6 +247,7 @@ function DayDetail({ date, summary }: { date: string | null; summary: DaySummary
             <span className="text-muted">
               <b className="text-fg">{int(summary.kcal)}</b> / {int(summary.goals.kcal)} ккал · точність{' '}
               <b className="text-fg">{Math.round(accuracy(summary) * 100)}%</b>
+              {summary.cheat && ' · читміл'}
             </span>
           ) : (
             <span className="text-muted">записів немає</span>

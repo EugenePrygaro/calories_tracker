@@ -3,21 +3,23 @@
  * щоб графік за рік читався однією командою, а не 365 HGETALL.
  * Оновлюється при кожній зміні записів дня; уперше будується з наявних днів.
  */
-import { DATE_RE, DEFAULT_GOALS } from '../shared/model.js'
+import { DATE_RE } from '../shared/model.js'
+import { goalsForDate } from '../shared/goals.js'
 import { summarize } from '../shared/stats.js'
 import { obj, sanitizeEntry, sanitizeProfile } from '../shared/validate.js'
 import { KEYS, parseStored } from './store.js'
 
 /** @typedef {import('./store.js').RedisClient} RedisClient */
 /** @typedef {import('../shared/stats.js').DaySummary} DaySummary */
-/** @typedef {import('../shared/model.js').Goals} Goals */
 
-/** @param {RedisClient} r @returns {Promise<Goals>} */
-async function currentGoals(r) {
+/** @typedef {import('../shared/model.js').Profile | null} ProfileOrNull */
+
+/** @param {RedisClient} r @returns {Promise<ProfileOrNull>} */
+async function currentProfile(r) {
   try {
-    return sanitizeProfile(parseStored(await r.get(KEYS.profile))).goals
+    return sanitizeProfile(parseStored(await r.get(KEYS.profile)))
   } catch {
-    return DEFAULT_GOALS
+    return null // профілю ще немає — норми за замовчуванням
   }
 }
 
@@ -33,16 +35,17 @@ function entriesOf(raw) {
 }
 
 /**
- * Перерахувати підсумок дня після зміни його записів.
- * @param {RedisClient} r @param {string} date @param {Goals} [goals]
+ * Перерахувати підсумок дня після зміни його записів. Норма — на цю дату (вихідні — більша).
+ * @param {RedisClient} r @param {string} date @param {ProfileOrNull} [profile] уже прочитаний профіль
  */
-export async function refreshDaySummary(r, date, goals) {
+export async function refreshDaySummary(r, date, profile) {
   const entries = entriesOf(await r.hgetall(KEYS.day(date)))
   if (entries.length === 0) {
     await r.hdel(KEYS.summary, date)
     return
   }
-  await r.hset(KEYS.summary, { [date]: summarize(date, entries, goals ?? (await currentGoals(r))) })
+  const p = profile === undefined ? await currentProfile(r) : profile
+  await r.hset(KEYS.summary, { [date]: summarize(date, entries, goalsForDate(p, date)) })
 }
 
 /** @param {unknown} v @returns {DaySummary | null} */
@@ -69,11 +72,11 @@ function sanitizeSummary(v) {
  */
 export async function loadSummaries(r) {
   if (!(await r.get(KEYS.summaryReady))) {
-    const goals = await currentGoals(r)
+    const profile = await currentProfile(r)
     const keys = await r.keys(KEYS.day('*'))
     for (const key of keys) {
       const date = key.slice(KEYS.day('').length)
-      if (DATE_RE.test(date)) await refreshDaySummary(r, date, goals)
+      if (DATE_RE.test(date)) await refreshDaySummary(r, date, profile)
     }
     await r.set(KEYS.summaryReady, 1)
   }

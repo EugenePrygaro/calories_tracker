@@ -1,4 +1,3 @@
-import confetti from 'canvas-confetti'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Sparkles, Star } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -7,6 +6,8 @@ import { CoinIcon } from '@/components/CoinIcon'
 import { ProgressBar } from '@/components/ProgressBar'
 import { claimAchievementReward, dismissAchievement, useFoods, useGame } from '@/data/store'
 import { int } from '@/lib/format'
+import { useSheetFlag } from '@/lib/sheetFlag'
+import { useUiStore } from '@/store/ui'
 import { AchievementIcon } from './AchievementIcon'
 import { GROUPS, TIERS } from './achievementStyle'
 
@@ -25,8 +26,10 @@ export function AchievementUnlockModal() {
   const game = useGame()
   const foods = useFoods()
 
+  // Поки відкрита шторка (додавання їжі тощо) — не перериваємо: модалка з'явиться після закриття
+  const sheetOpen = useUiStore((s) => s.modal !== null)
   const ownFoods = foods.filter((f) => f.source === 'own').length
-  const next = game ? newlyUnlocked(game, statsOf(game, ownFoods))[0] : undefined
+  const next = game && !sheetOpen ? newlyUnlocked(game, statsOf(game, ownFoods))[0] : undefined
 
   return (
     <AnimatePresence>
@@ -41,10 +44,13 @@ function UnlockCard({ a, progress }: { a: Achievement; progress: { current: numb
   const g = GROUPS[a.group]
   const tier = TIERS[a.tier]
   const [busy, setBusy] = useState(false)
+  useSheetFlag(true)
 
   useEffect(() => {
     const colors = [cssColor(g.color), cssColor('var(--coin)'), '#ffffff']
-    void confetti({ particleCount: 70, spread: 80, startVelocity: 42, origin: { x: 0.5, y: 0.42 }, colors, zIndex: 95, disableForReducedMotion: true })
+    void import('canvas-confetti').then(({ default: confetti }) =>
+      confetti({ particleCount: 70, spread: 80, startVelocity: 42, origin: { x: 0.5, y: 0.42 }, colors, zIndex: 95, disableForReducedMotion: true }),
+    )
     // Вібрація лише після першої взаємодії зі сторінкою (інакше браузер її блокує).
     if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.([40, 30, 80])
   }, [g.color])

@@ -71,6 +71,7 @@ test('читміл одразу зараховує день: +25 за норму
   const events = consumeItem(s, 'cheatMeal', NOW)
   assert.equal(s.coins, 25)
   assert.equal(s.days[TODAY]?.cheat, true)
+  assert.deepEqual(s.cheatDays, [TODAY]) // назавжди — для статистики
   assert.equal(events[0]?.type, 'reward')
 
   // 4000 ккал — далеко за нормою, але день лишається успішним і нагорода не повторюється

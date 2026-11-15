@@ -5,7 +5,8 @@ import { percent, sum } from '@shared/nutrition.js'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { Gauge } from '@/components/Gauge'
 import { ProgressBar } from '@/components/ProgressBar'
-import { useGoals } from '@/data/store'
+import { useDataStore, useGoalsFor } from '@/data/store'
+import { useUiStore } from '@/store/ui'
 import { grams, kcal } from '@/lib/format'
 
 const MACROS = [
@@ -18,7 +19,10 @@ const plusKcal = (n: number) => `+${kcal(n)}`
 const pct = (n: number) => `${Math.round(n)}%`
 
 export function DailySummary({ entries }: { entries: readonly Entry[] }) {
-  const goals = useGoals()
+  const date = useUiStore((s) => s.selectedDate)
+  const goals = useGoalsFor(date) // на вихідних калорій більше
+  const base = useDataStore((s) => s.profile?.goals.kcal)
+  const weekendExtra = base && goals.kcal > base ? Math.round((goals.kcal / base - 1) * 100) : 0
   const totals = sum(entries)
   const left = goals.kcal - totals.kcal
   const over = left < 0
@@ -54,8 +58,13 @@ export function DailySummary({ entries }: { entries: readonly Entry[] }) {
             <Flame className="size-4" />
             Спожито <AnimatedNumber value={totals.kcal} format={kcal} className="font-bold text-fg" />
           </span>
-          <span className="text-muted">
-            Ціль <b className="text-fg">{kcal(goals.kcal)}</b>
+          <span className="flex items-center gap-1.5 text-muted">
+            {weekendExtra > 0 && (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary" title="На вихідних норма калорій більша">
+                вихідний +{weekendExtra}%
+              </span>
+            )}
+            Ціль <AnimatedNumber value={goals.kcal} format={kcal} className="font-bold text-fg" />
           </span>
         </div>
         <ProgressBar value={totals.kcal} max={goals.kcal} className="h-3" label="Калорії" />

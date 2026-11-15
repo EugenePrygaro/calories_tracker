@@ -2,14 +2,16 @@ import { useEffect } from 'react'
 import { useGame } from '@/data/store'
 import { applyTheme, readCachedTheme, type AppTheme } from '@/lib/theme'
 import { useGameUi } from '@/store/gameUi'
+import { WinterDecor } from './WinterDecor'
 
 const initial = readCachedTheme()
 
-/** Активна тема: DEV-перегляд → вибір із гри → остання збережена (поки гра вантажиться). */
+/** Активна тема: примірка → DEV-перегляд → вибір із гри → остання збережена (поки гра вантажиться). */
 function useActiveTheme(): AppTheme {
+  const tryOn = useGameUi((s) => s.tryOn?.theme)
   const preview = useGameUi((s) => s.themePreview)
   const chosen = useGame()?.activeTheme as AppTheme | undefined
-  return preview ?? chosen ?? initial
+  return tryOn ?? preview ?? chosen ?? initial
 }
 
 /**
@@ -18,19 +20,23 @@ function useActiveTheme(): AppTheme {
  */
 export function ThemeEffects() {
   const theme = useActiveTheme()
-  const preview = useGameUi((s) => s.themePreview)
+  // запам'ятовуємо лише справжній вибір — не примірку й не DEV-перегляд
+  const temporary = useGameUi((s) => s.tryOn !== null || s.themePreview !== null)
 
   useEffect(() => {
-    applyTheme(theme, preview === null)
-  }, [theme, preview])
+    applyTheme(theme, !temporary)
+  }, [theme, temporary])
 
   switch (theme) {
     case 'newyear':
       return (
-        <div className="fx-layer" aria-hidden>
-          <div className="fx-fall fx-snow-b" />
-          <div className="fx-fall fx-snow-a" />
-        </div>
+        <>
+          <div className="fx-layer" aria-hidden>
+            <div className="fx-fall fx-snow-b" />
+            <div className="fx-fall fx-snow-a" />
+          </div>
+          <WinterDecor />
+        </>
       )
     case 'spring':
       return (

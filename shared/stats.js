@@ -18,7 +18,9 @@ import { sum } from './nutrition.js'
  *   carbs: number,
  *   entries: number,
  *   goals: Goals,
+ *   cheat?: boolean,
  * }} DaySummary
+ * cheat — у цей день використано «Читміл-квиток»: день зараховано як успішний.
  */
 
 /** @param {string} date @param {readonly Entry[]} entries @param {Goals} goals @returns {DaySummary} */
@@ -33,9 +35,10 @@ export const ACCURACY_WEIGHTS = { kcal: 0.4, protein: 0.25, fat: 0.175, carbs: 0
 /**
  * Точність дня, 0…1: 1 − зважене середнє відхилень від норм (кожне не більше 100%).
  * Відхилення 10% по всіх показниках → 0,9.
- * @param {Pick<DaySummary, 'kcal' | 'protein' | 'fat' | 'carbs' | 'goals'>} s
+ * @param {Pick<DaySummary, 'kcal' | 'protein' | 'fat' | 'carbs' | 'goals' | 'cheat'>} s
  */
 export function accuracy(s) {
+  if (s.cheat) return 1 // читміл: день зараховано як точний
   let total = 0
   let weights = 0
   for (const key of /** @type {const} */ (['kcal', 'protein', 'fat', 'carbs'])) {
@@ -47,8 +50,8 @@ export function accuracy(s) {
   return weights > 0 ? 1 - total / weights : 0
 }
 
-/** Пороги рівнів теплової карти (точність ≥ …): 4 — у межах ~10%, 3 — ~20%, 2 — ~35%. */
-export const LEVEL_THRESHOLDS = [0.9, 0.8, 0.65]
+/** Пороги рівнів теплової карти (точність ≥ …): 4 — «точний день» (≥ 85%), 3 — ≥ 75%, 2 — ≥ 60%. */
+export const LEVEL_THRESHOLDS = [0.85, 0.75, 0.6]
 
 /**
  * Рівень клітинки теплової карти: 0 — записів немає, 1…4 — що вище, то точніше.

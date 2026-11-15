@@ -9,7 +9,7 @@ import { useUiStore } from '@/store/ui'
 /** Верх екрана: HUD гейміфікації + навігація по днях. Прилипає при прокрутці. */
 export function DateHeader() {
   return (
-    <header className="sticky top-0 z-20 -mx-4 bg-gradient-to-b from-main from-80% to-main/0 px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-3">
+    <header data-app-header className="sticky top-0 z-20 -mx-4 bg-gradient-to-b from-main from-80% to-main/0 px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-3">
       <Hud />
       <DateNav />
     </header>
@@ -33,7 +33,13 @@ function DateNav() {
         <NavButton label="Попередній день" onClick={() => shiftDate(-1)}>
           <ChevronLeft className="size-5" />
         </NavButton>
-        <div className="relative flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden">
+        {/* Тап по даті — календар (розфарбований тепловою картою) */}
+        <button
+          type="button"
+          onClick={() => openModal({ type: 'calendar' })}
+          aria-label={`${title}, ${subtitle}. Відкрити календар`}
+          className="relative flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full active:bg-white/[0.04]"
+        >
           <AnimatePresence mode="popLayout" initial={false} custom={direction}>
             <motion.div
               key={date}
@@ -48,7 +54,7 @@ function DateNav() {
               <span className="block max-w-full truncate text-[11px] text-muted">{subtitle}</span>
             </motion.div>
           </AnimatePresence>
-        </div>
+        </button>
         <NavButton label="Наступний день" onClick={() => shiftDate(1)}>
           <ChevronRight className="size-5" />
         </NavButton>

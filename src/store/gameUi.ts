@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { GameEvent } from '@shared/game.js'
-import { isThemeId } from '@shared/shop.js'
+import { isThemeId, type ThemeId } from '@shared/shop.js'
 import type { AppTheme } from '@/lib/theme'
 
 /**
@@ -21,6 +21,10 @@ interface GameUiState {
   /** DEV: перегляд теми без покупки (лише на цьому пристрої); null — тема з гри */
   themePreview: AppTheme | null
   setThemePreview: (theme: AppTheme | null) => void
+  /** Примірка теми з магазину: діє до until (мс), потім повертається куплена */
+  tryOn: { theme: ThemeId; until: number } | null
+  startTryOn: (theme: ThemeId) => void
+  endTryOn: () => void
   setRevealIcons: (value: boolean) => void
   push: (events: readonly GameEvent[]) => void
   removeToast: (id: number) => void
@@ -29,6 +33,9 @@ interface GameUiState {
 }
 
 let nextId = 0
+
+/** Скільки триває примірка теми, с. */
+export const TRY_ON_SECONDS = 10
 
 const REVEAL_KEY = 'dev:revealIcons'
 function readReveal(): boolean {
@@ -53,6 +60,9 @@ export const useGameUi = create<GameUiState>()((set) => ({
   toasts: [],
   revealIcons: readReveal(),
   themePreview: readPreview(),
+  tryOn: null,
+  startTryOn: (theme) => set({ tryOn: { theme, until: Date.now() + TRY_ON_SECONDS * 1000 } }),
+  endTryOn: () => set({ tryOn: null }),
   setThemePreview: (theme) => {
     try {
       if (theme === null) localStorage.removeItem(PREVIEW_KEY)

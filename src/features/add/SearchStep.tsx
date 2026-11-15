@@ -1,11 +1,12 @@
-import { ChevronRight, History, LoaderCircle, PencilLine, RotateCcw, Search, X, Zap } from 'lucide-react'
-import { useEffect, type ReactNode } from 'react'
+import { ChevronRight, History, LoaderCircle, PencilLine, RotateCcw, Search, X } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { LIMITS, type FoodItem } from '@shared/model.js'
 import { Button } from '@/components/ui/Button'
 import { SheetFooter } from '@/components/ui/Modal'
 import { filterFoods, useOffSearch } from '@/data/search'
 import { loadDay, useDataStore, useDay, useFoods } from '@/data/store'
 import { addDays } from '@/lib/date'
+import { cn } from '@/lib/cn'
 import { useUiStore } from '@/store/ui'
 import { FoodRow } from './FoodRow'
 
@@ -14,15 +15,33 @@ interface SearchStepProps {
   onQuery: (q: string) => void
   onPick: (item: FoodItem) => void
   onManual: () => void
-  onQuick: () => void
   onYesterday: () => void
 }
 
-export function SearchStep({ query, onQuery, onPick, onManual, onQuick, onYesterday }: SearchStepProps) {
+type Sort = 'recent' | 'frequent' | 'all'
+const SORTS: { value: Sort; label: string }[] = [
+  { value: 'recent', label: 'Нещодавні' },
+  { value: 'frequent', label: 'Часті' },
+  { value: 'all', label: 'Усі' },
+]
+/** Скільки страв показувати в «Нещодавні» / «Часті». */
+const TOP = 15
+
+export function SearchStep({ query, onQuery, onPick, onManual, onYesterday }: SearchStepProps) {
   const foods = useFoods()
   const foodsLoaded = useDataStore((s) => s.foodsLoaded)
+  const usage = useDataStore((s) => s.foodUsage)
+  const [sort, setSort] = useState<Sort>('recent')
   const savedIds = new Set(foods.map((f) => f.id))
-  const mine = filterFoods(foods, query).slice(0, 30)
+  const used = foods.filter((f) => usage[f.id])
+  // з пошуковим запитом — шукаємо серед усіх; без запиту — нещодавні / часті / усі
+  const mine = query.trim()
+    ? filterFoods(foods, query).slice(0, 30)
+    : sort === 'recent'
+      ? [...used].sort((a, b) => (usage[b.id]?.last ?? 0) - (usage[a.id]?.last ?? 0)).slice(0, TOP)
+      : sort === 'frequent'
+        ? [...used].sort((a, b) => (usage[b.id]?.n ?? 0) - (usage[a.id]?.n ?? 0)).slice(0, TOP)
+        : foods
   const off = useOffSearch(query)
   const searching = query.trim().length >= LIMITS.searchQuery.min
   const yesterday = addDays(useUiStore((s) => s.selectedDate), -1)
@@ -76,7 +95,26 @@ export function SearchStep({ query, onQuery, onPick, onManual, onQuick, onYester
         </button>
       )}
 
-      <Section title="Мої страви" count={foodsLoaded ? mine.length : undefined}>
+      <Section title="Мої страви" count={foodsLoaded && query.trim() ? mine.length : undefined}>
+        {!query.trim() && (
+          <div role="radiogroup" aria-label="Порядок моїх страв" className="flex gap-1.5 px-1 pb-2">
+            {SORTS.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                role="radio"
+                aria-checked={sort === s.value}
+                onClick={() => setSort(s.value)}
+                className={cn(
+                  'h-8 rounded-full px-3 text-xs font-bold ring-1 ring-inset transition-colors',
+                  sort === s.value ? 'bg-primary/15 text-primary ring-primary/40' : 'bg-white/[0.04] text-muted ring-white/[0.06]',
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
         {mine.length > 0 ? (
           <ul>
             {mine.map((f) => (
@@ -84,7 +122,13 @@ export function SearchStep({ query, onQuery, onPick, onManual, onQuick, onYester
             ))}
           </ul>
         ) : (
-          <Hint>{!foodsLoaded ? 'Завантаження…' : 'Нічого не знайдено'}</Hint>
+          <Hint>
+            {!foodsLoaded
+              ? 'Завантаження…'
+              : query.trim()
+                ? 'Нічого не знайдено'
+                : 'Тут з’являться страви, які ви додаєте найчастіше'}
+          </Hint>
         )}
       </Section>
 
@@ -115,10 +159,7 @@ export function SearchStep({ query, onQuery, onPick, onManual, onQuick, onYester
 
       <SheetFooter>
         <Button variant="ghost" onClick={onManual} className="flex-1 px-3 text-sm whitespace-nowrap">
-          <PencilLine className="size-4" /> Вручну
-        </Button>
-        <Button variant="ghost" onClick={onQuick} className="flex-1 px-3 text-sm whitespace-nowrap">
-          <Zap className="size-4" /> Швидкий запис
+          <PencilLine className="size-4" /> Ввести вручну
         </Button>
       </SheetFooter>
     </div>

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
 import { Calculator, CloudOff, Plus } from 'lucide-react'
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { MEAL_TYPES } from '@shared/model.js'
 import { ThemeEffects } from '@/components/ThemeEffects'
 import { Toast } from '@/components/Toast'
@@ -8,12 +8,14 @@ import { loadDay, useDay } from '@/data/store'
 import { BodyCard } from '@/features/body/BodyCard'
 import { DailySummary } from '@/features/DailySummary'
 import { DateHeader } from '@/features/DateHeader'
-import { DevPanel } from '@/features/dev/DevPanel'
+import { isDevEnabled } from '@/features/dev/devEnabled'
 import { AchievementUnlockModal } from '@/features/game/AchievementUnlockModal'
 import { RewardFeed } from '@/features/game/RewardFeed'
 import { StreakNotice } from '@/features/game/StreakNotice'
+import { DevPanel } from '@/features/lazySheets'
 import { MealSection } from '@/features/MealSection'
 import { StatsCard } from '@/features/stats/StatsCard'
+import { TryOnBanner } from '@/features/game/TryOnBanner'
 import { ModalHost } from '@/features/ModalHost'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -41,6 +43,8 @@ const intro = {
   }),
 }
 
+const devEnabled = isDevEnabled()
+
 export default function App() {
   const date = useUiStore((s) => s.selectedDate)
   const direction = useUiStore((s) => s.direction)
@@ -52,7 +56,9 @@ export default function App() {
   }, [])
   const isEmpty = day.loaded && day.entries.length === 0
 
-  const onSwipe = (_: unknown, info: PanInfo) => {
+  const onSwipe = (event: PointerEvent, info: PanInfo) => {
+    // свайп по рядку запису — це видалення, а не перехід між днями
+    if (event.target instanceof Element && event.target.closest('[data-row-swipe]')) return
     const { offset, velocity } = info
     if (Math.abs(offset.y) > Math.abs(offset.x)) return // це був скрол
     if (offset.x < -SWIPE_DISTANCE || velocity.x < -SWIPE_VELOCITY) {
@@ -119,10 +125,11 @@ export default function App() {
       </motion.div>
 
       {/* Особисті параметри — не залежать від дня, тому поза каруселлю днів */}
-      <motion.div custom={5} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show">
+      {/* below-fold: content-visibility — браузер пропускає верстку й малювання, поки не догорнули */}
+      <motion.div custom={5} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_420px] [content-visibility:auto]">
         <BodyCard />
       </motion.div>
-      <motion.div custom={6} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show">
+      <motion.div custom={6} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_260px] [content-visibility:auto]">
         <StatsCard />
       </motion.div>
 
@@ -135,7 +142,7 @@ export default function App() {
         initial={introPlayed ? false : { scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.6, type: 'spring', stiffness: 380, damping: 22 }}
-        className="card fixed bottom-[calc(1.25rem+12px+env(safe-area-inset-bottom))] left-5 z-30 flex size-10 items-center justify-center rounded-full text-primary shadow-lg"
+        className="card fixed bottom-[calc(1.25rem+10px+env(safe-area-inset-bottom))] left-5 z-30 flex size-11 items-center justify-center rounded-full text-primary shadow-lg"
       >
         <Calculator className="size-5" strokeWidth={2} />
       </motion.button>
@@ -165,11 +172,16 @@ export default function App() {
         <Plus className="relative size-8" strokeWidth={2.5} />
       </motion.button>
 
+      <TryOnBanner />
       <ModalHost />
       <Toast />
       <RewardFeed />
       <AchievementUnlockModal />
-      <DevPanel />
+      {devEnabled && (
+        <Suspense fallback={null}>
+          <DevPanel />
+        </Suspense>
+      )}
       <ThemeEffects />
     </div>
   )

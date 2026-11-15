@@ -94,5 +94,5 @@ test('профіль: значення за замовчуванням, збер
   assert.equal(stale.body.applied, false)
 
   const after = await call(profile)
-  assert.deepEqual(after.body.profile, { goals, targetWeight: null, updatedAt: 500 })
+  assert.deepEqual(after.body.profile, { goals, targetWeight: null, weekendBoost: 15, updatedAt: 500 })
 })

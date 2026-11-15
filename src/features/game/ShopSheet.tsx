@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check,
+  Eye,
   FlameKindling,
   Package,
   PackagePlus,
@@ -32,6 +33,8 @@ import {
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { CoinIcon } from '@/components/CoinIcon'
 import { activateShopItem, buyShopItem, chooseTheme, useGame } from '@/data/store'
+import { useGameUi } from '@/store/gameUi'
+import { useUiStore } from '@/store/ui'
 import { cn } from '@/lib/cn'
 import { toDateKey } from '@/lib/date'
 import { int } from '@/lib/format'
@@ -263,8 +266,20 @@ function ThemeCard({ item, game, index }: { item: ShopItem; game: GameState; ind
     <CardShell item={item} index={index} badge={<Swatches colors={THEME_LOOK[theme].swatches} size="size-5" />}>
       {!owned ? (
         <>
-          <span className="min-w-0 flex-1 text-xs text-muted">
-            {buyBlock === 'not_enough_coins' && price !== null && `Ще ${int(price - game.coins)} до покупки`}
+          {/* Примірка: 10 секунд теми на справжньому екрані, щоб не купувати наосліп */}
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              useGameUi.getState().startTryOn(theme)
+              useUiStore.getState().closeModal()
+            }}
+            className="flex h-10 items-center gap-1.5 rounded-full bg-white/[0.06] px-4 text-sm font-bold ring-1 ring-inset ring-white/[0.1]"
+          >
+            <Eye className="size-4" /> Приміряти
+          </motion.button>
+          <span className="min-w-0 flex-1 text-right text-[11px] leading-tight text-muted">
+            {buyBlock === 'not_enough_coins' && price !== null && `ще ${int(price - game.coins)}`}
           </span>
           <BuyButton price={price} block={buyBlock} busy={busy} onBuy={() => run(() => buyShopItem(theme))} />
         </>
