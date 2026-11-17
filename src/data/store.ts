@@ -15,6 +15,19 @@ import { sanitizeBodyRecord, sanitizeEntry, sanitizeFood, sanitizeProfile } from
 import type { GameState } from '@shared/game.js'
 import { goalsForDate } from '@shared/goals.js'
 import type { DaySummary } from '@shared/stats.js'
+import {
+  PROFILE_KEY,
+  bodyKey,
+  enqueue,
+  entryKey,
+  foodKey,
+  overlayBody,
+  overlayDay,
+  overlayFoods,
+  overlayProfile,
+  requeueFront,
+  type OutboxOp,
+} from '@shared/outbox.js'
 import type { ShopErrorCode, ShopItemId, UsableItemId } from '@shared/shop.js'
 import { toDateKey } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
@@ -62,6 +75,8 @@ interface DataState {
   stats: DaySummary[] | null
   /** Скільки запитів на збереження зараз у дорозі. */
   saving: number
+  /** Скільки змін чекають мережі в офлайн-черзі */
+  pending: number
 }
 
 export const useDataStore = create<DataState>()(() => ({
@@ -73,6 +88,7 @@ export const useDataStore = create<DataState>()(() => ({
   body: [],
   bodyLoaded: false,
   saving: 0,
+  pending: 0,
   game: null,
   stats: null,
 }))
@@ -213,17 +229,155 @@ function errorMessage(err: unknown): string {
   return 'Не вдалося зберегти. Спробуйте ще раз.'
 }
 
-/** Збереження: у чергу, лічильник «зберігається…», відкат і тост при помилці. */
-async function save<T>(request: () => Promise<T>, rollback: () => void): Promise<T> {
+/**
+ * Збереження, яке потребує мережі (дії в грі: магазин, нагороди, теми): у чергу запитів,
+ * лічильник «зберігається…», відкат і тост при помилці. quiet — без тосту (фонові позначки).
+ */
+async function save<T>(request: () => Promise<T>, rollback: () => void, opts: { quiet?: boolean } = {}): Promise<T> {
   useDataStore.setState((s) => ({ saving: s.saving + 1 }))
   try {
     return await serial(request)
   } catch (err) {
     rollback()
+    if (!opts.quiet) {
+      useUiStore
+        .getState()
+        .showToast(err instanceof NetworkError ? 'Потрібен інтернет: магазин, нагороди й теми працюють лише онлайн' : errorMessage(err))
+    }
+    throw err
+  } finally {
+    useDataStore.setState((s) => ({ saving: s.saving - 1 }))
+  }
+}
+
+// ─── Офлайн-черга ────────────────────────────────────────────────────────────
+
+/**
+ * Записи їжі, заміри, профіль і страви без мережі не відкочуються, а чекають у черзі
+ * (localStorage — переживає закриття застосунку) і надсилаються, щойно з'явиться зв'язок.
+ * Склеювання змін і накладання на дані з сервера — shared/outbox.js.
+ * Сервер нараховує нагороди за такі записи від часу їх створення (shared/game.js, rewardMoment).
+ */
+const OUTBOX_KEY = 'ct:outbox:v1'
+
+function readOutbox(): OutboxOp[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]')
+    return Array.isArray(v) ? (v as OutboxOp[]) : []
+  } catch {
+    return []
+  }
+}
+
+let outbox: OutboxOp[] = typeof window === 'undefined' ? [] : readOutbox()
+useDataStore.setState({ pending: outbox.length })
+
+function setOutbox(next: OutboxOp[]) {
+  outbox = next
+  try {
+    if (next.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(next))
+    else localStorage.removeItem(OUTBOX_KEY)
+  } catch {
+    // переповнено чи приватний режим — черга живе до перезавантаження
+  }
+  useDataStore.setState({ pending: next.length })
+}
+
+let offlineNotified = false
+function queueOffline(op: OutboxOp) {
+  setOutbox(enqueue(outbox, op))
+  if (!offlineNotified) {
+    offlineNotified = true
+    useUiStore.getState().showToast('Немає мережі — зміни збережено на телефоні й надішлемо, щойно з’явиться зв’язок', { tone: 'info' })
+  }
+}
+
+/**
+ * Зміна даних: надіслати, а без мережі — у чергу (без відкату). Повертає відповідь сервера
+ * або null, якщо зміна чекає в черзі. Поки черга не порожня, нові зміни стають за нею — порядок зберігається.
+ */
+async function write<T>(op: OutboxOp, request: () => Promise<T>, rollback: () => void): Promise<T | null> {
+  if (outbox.length > 0 || !navigator.onLine) {
+    queueOffline(op)
+    void flushOutbox()
+    return null
+  }
+  useDataStore.setState((s) => ({ saving: s.saving + 1 }))
+  try {
+    return await serial(request)
+  } catch (err) {
+    if (err instanceof NetworkError) {
+      queueOffline(op)
+      return null
+    }
+    rollback()
     useUiStore.getState().showToast(errorMessage(err))
     throw err
   } finally {
     useDataStore.setState((s) => ({ saving: s.saving - 1 }))
+  }
+}
+
+/** Надіслати одну зміну з черги й застосувати відповідь (нагороди, новіші версії з сервера). */
+async function sendOp(op: OutboxOp): Promise<void> {
+  switch (op.kind) {
+    case 'putEntry':
+      applyEntryResponse(await api.putEntry(op.entry, op.source, op.foodId))
+      return
+    case 'deleteEntry':
+      await api.deleteEntry(op.id, op.date)
+      return
+    case 'putProfile': {
+      const res = await api.putProfile(op.profile)
+      if (!res.applied) useDataStore.setState({ profile: res.profile })
+      return
+    }
+    case 'putBody': {
+      const res = await api.putBody(op.record)
+      if (!res.applied) setBodyLocal((rs) => [...rs.filter((r) => r.date !== res.record.date), res.record])
+      return
+    }
+    case 'deleteBody':
+      await api.deleteBody(op.date)
+      return
+    case 'putFood': {
+      const res = await api.putFood(op.food)
+      if (!res.applied) putFoodLocal(res.food)
+      return
+    }
+  }
+}
+
+let flushing = false
+
+/** Надіслати чергу по одній зміні. Мережа знову зникла — зупиняємось, решта чекає далі. */
+export async function flushOutbox(): Promise<void> {
+  if (flushing || outbox.length === 0 || !navigator.onLine) return
+  flushing = true
+  let sent = 0
+  try {
+    while (outbox.length > 0) {
+      const op = outbox[0] as OutboxOp
+      setOutbox(outbox.slice(1))
+      try {
+        await serial(() => sendOp(op))
+        sent++
+      } catch (err) {
+        if (err instanceof NetworkError || (err instanceof ApiError && err.status >= 500)) {
+          setOutbox(requeueFront(outbox, op))
+          break
+        }
+        // сервер відхилив саму зміну (некоректні дані) — повторювати марно
+        useUiStore.getState().showToast('Одну зміну не вдалося синхронізувати — сервер її відхилив')
+      }
+    }
+  } finally {
+    flushing = false
+  }
+  if (outbox.length === 0 && sent > 0) {
+    offlineNotified = false
+    useUiStore.getState().showToast(`Синхронізовано змін: ${sent}`, { tone: 'info' })
+    void loadStats()
   }
 }
 
@@ -253,7 +407,8 @@ export function loadDay(date: string): Promise<void> {
 
   const p = guardedLoad(
     () => api.getDay(date),
-    ({ entries }) => patchDay(date, { entries, loaded: true, error: false, loadedAt: Date.now() }),
+    // ще не надіслані офлайн-зміни цього дня — поверх серверних даних
+    ({ entries }) => patchDay(date, { entries: overlayDay(entries, date, outbox), loaded: true, error: false, loadedAt: Date.now() }),
   )
     .catch(() => patchDay(date, { error: true }))
     .finally(() => inflight.delete(date))
@@ -306,11 +461,12 @@ export async function addEntry(draft: EntryDraft, opts: { foodId?: string } = {}
       return { foodUsage: { ...s.foodUsage, [id]: { n: (prev?.n ?? 0) + 1, last: entry.createdAt } } }
     })
   }
-  const res = await save(
+  const res = await write(
+    { kind: 'putEntry', key: entryKey(entry.id), entry, isNew: true, ...(opts.foodId ? { foodId: opts.foodId } : {}) },
     () => api.putEntry(entry, undefined, opts.foodId),
     () => mutateDay(entry.date, (es) => es.filter((e) => e.id !== entry.id)),
   )
-  applyEntryResponse(res)
+  if (res) applyEntryResponse(res)
 }
 
 /**
@@ -333,9 +489,14 @@ export async function copyEntries(
 
   for (const [i, { src, entry }] of copies.entries()) {
     try {
-      const res = await save(() => api.putEntry(entry, i === 0 ? 'copy' : undefined), () => {})
-      applyEntryResponse(res)
-      onCopied?.(src.id)
+      const source = i === 0 ? ('copy' as const) : undefined
+      const res = await write(
+        { kind: 'putEntry', key: entryKey(entry.id), entry, isNew: true, ...(source ? { source } : {}) },
+        () => api.putEntry(entry, source),
+        () => {},
+      )
+      if (res) applyEntryResponse(res)
+      onCopied?.(src.id) // і надіслане, і поставлене в офлайн-чергу — уже скопійоване
     } catch (err) {
       // ця й решта ще не надісланих копій — прибираємо
       const unsent = new Set(copies.slice(i).map((c) => c.entry.id))
@@ -356,17 +517,19 @@ export async function updateEntry(prev: Entry, patch: EntryPatch): Promise<void>
     updatedAt: Math.max(Date.now(), prev.updatedAt + 1),
   })
   mutateDay(prev.date, (es) => es.map((e) => (e.id === prev.id ? next : e)))
-  const res = await save(
+  const res = await write(
+    { kind: 'putEntry', key: entryKey(next.id), entry: next, isNew: false },
     () => api.putEntry(next),
     // відкочуємо, лише якщо після нас запис ніхто не змінив
     () => mutateDay(prev.date, (es) => es.map((e) => (e === next ? prev : e))),
   )
-  applyEntryResponse(res)
+  if (res) applyEntryResponse(res)
 }
 
 export async function deleteEntry(entry: Entry): Promise<void> {
   mutateDay(entry.date, (es) => es.filter((e) => e.id !== entry.id))
-  await save(
+  await write(
+    { kind: 'deleteEntry', key: entryKey(entry.id), id: entry.id, date: entry.date },
     () => api.deleteEntry(entry.id, entry.date),
     () => mutateDay(entry.date, (es) => (es.some((e) => e.id === entry.id) ? es : [...es, entry])),
   )
@@ -386,11 +549,12 @@ export function removeEntry(entry: Entry): void {
 async function restoreEntry(entry: Entry): Promise<void> {
   const back = { ...entry, updatedAt: Math.max(Date.now(), entry.updatedAt + 1) }
   mutateDay(entry.date, (es) => (es.some((e) => e.id === entry.id) ? es : [...es, back]))
-  const res = await save(
+  const res = await write(
+    { kind: 'putEntry', key: entryKey(back.id), entry: back, isNew: false },
     () => api.putEntry(back),
     () => mutateDay(entry.date, (es) => es.filter((e) => e !== back)),
   )
-  applyEntryResponse(res)
+  if (res) applyEntryResponse(res)
 }
 
 // ─── Профіль: денні цілі й цільова вага ──────────────────────────────────────
@@ -412,13 +576,14 @@ export async function saveProfile(input: ProfileInput): Promise<void> {
     updatedAt: Math.max(Date.now(), (prev?.updatedAt ?? 0) + 1),
   })
   useDataStore.setState({ profile })
-  const res = await save(
+  const res = await write(
+    { kind: 'putProfile', key: PROFILE_KEY, profile },
     () => api.putProfile(profile),
     () => {
       if (useDataStore.getState().profile === profile) useDataStore.setState({ profile: prev })
     },
   )
-  if (!res.applied) useDataStore.setState({ profile: res.profile })
+  if (res && !res.applied) useDataStore.setState({ profile: res.profile })
 }
 
 // ─── Заміри тіла ─────────────────────────────────────────────────────────────
@@ -444,20 +609,22 @@ export async function saveBodyRecord(date: string, input: BodyInput): Promise<vo
     setBodyLocal((rs) => [...rs.filter((r) => r.date !== date), ...(to ? [to] : [])])
 
   replace(record)
-  const res = await save(
+  const res = await write(
+    { kind: 'putBody', key: bodyKey(date), record },
     () => api.putBody(record),
     () => {
       if (useDataStore.getState().body.some((r) => r === record)) replace(prev)
     },
   )
-  if (!res.applied) replace(res.record)
+  if (res && !res.applied) replace(res.record)
 }
 
 export async function deleteBodyRecord(date: string): Promise<void> {
   const prev = useDataStore.getState().body.find((r) => r.date === date)
   if (!prev) return
   setBodyLocal((rs) => rs.filter((r) => r.date !== date))
-  await save(
+  await write(
+    { kind: 'deleteBody', key: bodyKey(date), date },
     () => api.deleteBody(date),
     () => setBodyLocal((rs) => (rs.some((r) => r.date === date) ? rs : [...rs, prev])),
   )
@@ -484,10 +651,11 @@ function withPendingSeen(game: GameState): GameState {
 }
 
 /** Забрати нагороду ачівки, закрити сповіщення, dev-дії. Помилку покаже тост. */
-export async function gameAction(action: GameAction): Promise<void> {
+export async function gameAction(action: GameAction, opts: { quiet?: boolean } = {}): Promise<void> {
   const res = await save(
     () => api.gameAction(action),
     () => {},
+    opts,
   )
   applyGameResult(res)
 }
@@ -503,7 +671,7 @@ function markAchievementSeen(id: string): void {
 /** Модалку ачівки закрили: пізніше нагороду можна забрати у вітрині. */
 export function dismissAchievement(id: string): void {
   markAchievementSeen(id)
-  void gameAction({ action: 'seen', id }).catch(() => {})
+  void gameAction({ action: 'seen', id }, { quiet: true }).catch(() => {})
 }
 
 /** Забрати нагороду з модалки ачівки. */
@@ -548,7 +716,7 @@ export async function chooseTheme(theme: AppTheme | 'random'): Promise<void> {
 export function dismissStreakNotice(): void {
   const game = useDataStore.getState().game
   if (game) useDataStore.setState({ game: { ...game, notice: null } })
-  void gameAction({ action: 'dismissNotice' }).catch(() => {})
+  void gameAction({ action: 'dismissNotice' }, { quiet: true }).catch(() => {})
 }
 
 // ─── Мої страви ──────────────────────────────────────────────────────────────
@@ -573,7 +741,8 @@ export async function saveFood(item: FoodItem): Promise<void> {
   })
 
   putFoodLocal(food)
-  const res = await save(
+  const res = await write(
+    { kind: 'putFood', key: foodKey(food.id), food },
     () => api.putFood(food),
     () => {
       if (!useDataStore.getState().foods.includes(food)) return // після нас уже змінили
@@ -582,7 +751,7 @@ export async function saveFood(item: FoodItem): Promise<void> {
       }))
     },
   )
-  if (!res.applied) putFoodLocal(res.food)
+  if (res && !res.applied) putFoodLocal(res.food)
 }
 
 /** Нова власна страва з ручного вводу. */
@@ -617,6 +786,9 @@ export const useFoods = (): Food[] => useDataStore((s) => s.foods)
 export const useBody = (): BodyRecord[] => useDataStore((s) => s.body)
 
 export const useGame = (): GameState | null => useDataStore((s) => s.game)
+
+/** Скільки змін чекають мережі (індикатор у шапці). */
+export const usePending = (): number => useDataStore((s) => s.pending)
 
 export const useTargetWeight = (): number | null => useDataStore((s) => s.profile?.targetWeight ?? null)
 
@@ -655,9 +827,12 @@ export function startAutoRefresh(): () => void {
     lastToday = today
 
     void loadDay(useUiStore.getState().selectedDate)
-    void guardedLoad(api.getProfile, ({ profile }) => useDataStore.setState({ profile })).catch(() => {})
-    void guardedLoad(api.getFoods, ({ foods, usage }) => useDataStore.setState({ foods, foodsLoaded: true, foodUsage: usage ?? {} })).catch(() => {})
-    void guardedLoad(api.getBody, ({ records }) => useDataStore.setState({ body: records, bodyLoaded: true })).catch(() => {})
+    // дані з сервера + ще не надіслані офлайн-зміни поверх
+    void guardedLoad(api.getProfile, ({ profile }) => useDataStore.setState({ profile: overlayProfile(profile, outbox) })).catch(() => {})
+    void guardedLoad(api.getFoods, ({ foods, usage }) =>
+      useDataStore.setState({ foods: overlayFoods(foods, outbox), foodsLoaded: true, foodUsage: usage ?? {} }),
+    ).catch(() => {})
+    void guardedLoad(api.getBody, ({ records }) => useDataStore.setState({ body: overlayBody(records, outbox), bodyLoaded: true })).catch(() => {})
     void guardedLoad(api.getGame, ({ game }) => useDataStore.setState({ game: withPendingSeen(game) })).catch(() => {})
     void loadStats()
   }
@@ -666,11 +841,16 @@ export function startAutoRefresh(): () => void {
   }
   const onVisible = () => {
     if (document.visibilityState !== 'visible') return
+    void flushOutbox()
     // повернулись після півночі — оновлюємо одразу (перехід на новий день), інакше не частіше REFRESH_MIN_MS
     if (toDateKey() !== lastToday) refresh()
     else throttled(REFRESH_MIN_MS)()
   }
-  const onOnline = throttled(ONLINE_MIN_MS)
+  const onlineRefresh = throttled(ONLINE_MIN_MS)
+  // зв'язок повернувся: спершу надсилаємо офлайн-чергу, потім оновлюємо дані
+  const onOnline = () => {
+    void flushOutbox().finally(onlineRefresh)
+  }
 
   // Свайпи по днях: тягнемо лише день, на якому зупинились
   let dateTimer: ReturnType<typeof setTimeout> | undefined
@@ -682,6 +862,7 @@ export function startAutoRefresh(): () => void {
 
   document.addEventListener('visibilitychange', onVisible)
   window.addEventListener('online', onOnline)
+  void flushOutbox() // черга з минулого разу
   refresh()
 
   return () => {

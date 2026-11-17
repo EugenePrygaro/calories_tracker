@@ -15,6 +15,7 @@ import { ProgressBar } from '@/components/ProgressBar'
 import { gameAction, useFoods, useGame } from '@/data/store'
 import { cn } from '@/lib/cn'
 import { int } from '@/lib/format'
+import { useOnline } from '@/lib/online'
 import { useGameUi } from '@/store/gameUi'
 import { AchievementIcon } from './AchievementIcon'
 import { claimableAchievements } from './useClaimableCount'
@@ -184,6 +185,7 @@ interface CardProps {
 
 function AchievementCard({ a, progress, index }: CardProps) {
   const [busy, setBusy] = useState(false)
+  const online = useOnline()
   const reveal = useGameUi((s) => s.revealIcons)
   const g = GROUPS[a.group]
   const tier = TIERS[a.tier]
@@ -264,7 +266,7 @@ function AchievementCard({ a, progress, index }: CardProps) {
           <motion.button
             key="claim"
             type="button"
-            disabled={!claimable || busy}
+            disabled={!claimable || busy || !online}
             onClick={claim}
             whileTap={claimable ? { scale: 0.96 } : {}}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -273,7 +275,7 @@ function AchievementCard({ a, progress, index }: CardProps) {
               claimable ? 'bg-accent-gradient glow text-white' : 'bg-white/[0.04] text-muted',
             )}
           >
-            {claimable ? 'Забрати нагороду' : 'Ще не досягнуто'}
+            {claimable ? (online ? 'Забрати нагороду' : 'Потрібен інтернет') : 'Ще не досягнуто'}
           </motion.button>
         )}
       </AnimatePresence>

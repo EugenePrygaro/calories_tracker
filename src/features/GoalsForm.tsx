@@ -9,6 +9,7 @@ import { SheetFooter } from '@/components/ui/Modal'
 import { saveProfile, useDataStore, useGoals, useTargetWeight } from '@/data/store'
 import { kcal, parseNum } from '@/lib/format'
 import { ThemePicker } from './game/ThemePicker'
+import { NotificationsSetting } from './NotificationsSetting'
 
 type GoalsInput = Record<keyof Goals, string>
 
@@ -61,6 +62,7 @@ function GoalsFormInner({ onDone }: { onDone: () => void }) {
     <form onSubmit={submit} className="flex flex-col gap-5">
       {/* з'являється, щойно куплено хоч одну тему */}
       <ThemePicker />
+      <NotificationsSetting />
 
       <Group title="Харчування на день">
         <NumberField label="Калорії" suffix="ккал" value={f.kcal} onChange={set('kcal')} inputMode="numeric" />

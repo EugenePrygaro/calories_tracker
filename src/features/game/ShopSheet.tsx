@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check,
   ChevronDown,
+  CloudOff,
   Eye,
   FlameKindling,
   Package,
@@ -40,6 +41,7 @@ import { useUiStore } from '@/store/ui'
 import { cn } from '@/lib/cn'
 import { toDateKey } from '@/lib/date'
 import { int } from '@/lib/format'
+import { useOnline } from '@/lib/online'
 import { Swatches } from './ThemePicker'
 import { THEME_LOOK } from './themeStyle'
 
@@ -68,11 +70,17 @@ const CATEGORY_ICONS: Record<ShopCategory, LucideIcon> = {
 /** Магазин: баланс, товари за категоріями, кількість в інвентарі, «Купити» / «Використати» / «Застосувати». */
 export function ShopSheet() {
   const game = useGame()
+  const online = useOnline()
   if (!game) return <p className="py-10 text-center text-sm text-muted">Завантаження…</p>
 
   return (
     <div className="flex flex-col gap-7 pb-6">
       <Balance game={game} />
+      {!online && (
+        <p className="-mt-4 flex items-center gap-2 rounded-2xl bg-warning/10 px-4 py-3 text-xs text-warning">
+          <CloudOff className="size-4 shrink-0" /> Немає мережі — купівля й використання товарів недоступні. Приміряти теми можна.
+        </p>
+      )}
       {SHOP_CATEGORIES.map((cat) => {
         const Icon = CATEGORY_ICONS[cat.id]
         return (
@@ -235,6 +243,7 @@ const USE_HINTS: Partial<Record<string, string>> = {
 
 function ItemCard({ item, game, index }: { item: ShopItem; game: GameState; index: number }) {
   const [busy, setBusy] = useState<'buy' | 'use' | null>(null)
+  const online = useOnline()
   const { color } = lookOf(item.id)
   const price = priceOf(item.id, game)
   const owned = ownedOf(item.id, game)
@@ -282,7 +291,7 @@ function ItemCard({ item, game, index }: { item: ShopItem; game: GameState; inde
           <motion.button
             type="button"
             whileTap={{ scale: 0.95 }}
-            disabled={busy !== null}
+            disabled={busy !== null || !online}
             onClick={() => run('use', () => activateShopItem(usable))}
             className="flex h-10 flex-1 items-center justify-center rounded-full text-sm font-bold ring-1 ring-inset disabled:opacity-60"
             style={{
@@ -307,6 +316,7 @@ function ItemCard({ item, game, index }: { item: ShopItem; game: GameState; inde
 /** Тема: купується раз; потім — «Застосувати» або позначка «Активна». */
 function ThemeCard({ item, game, index }: { item: ShopItem; game: GameState; index: number }) {
   const [busy, setBusy] = useState(false)
+  const online = useOnline()
   if (!isThemeId(item.id)) return null
   const theme = item.id
   const owned = theme in game.themes
@@ -370,7 +380,7 @@ function ThemeCard({ item, game, index }: { item: ShopItem; game: GameState; ind
           <motion.button
             type="button"
             whileTap={{ scale: 0.95 }}
-            disabled={busy}
+            disabled={busy || !online}
             onClick={() => run(() => chooseTheme(theme))}
             className="flex h-10 items-center rounded-full bg-white/[0.06] px-4 text-sm font-bold ring-1 ring-inset ring-white/[0.1] disabled:opacity-60"
           >
@@ -393,13 +403,14 @@ function BuyButton({
   busy: boolean
   onBuy: () => void
 }) {
+  const online = useOnline()
   if (block === 'max_level' || price === null) {
     return <span className="rounded-full bg-white/[0.04] px-4 py-2.5 text-xs font-bold text-muted">Максимум</span>
   }
   if (block === 'inventory_full') {
     return <span className="rounded-full bg-white/[0.04] px-4 py-2.5 text-xs font-bold text-muted">Інвентар повний</span>
   }
-  const poor = block === 'not_enough_coins'
+  const poor = block === 'not_enough_coins' || !online
   return (
     <motion.button
       type="button"

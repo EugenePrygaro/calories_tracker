@@ -11,6 +11,8 @@
  *   ct:summary:ready     string  позначка: підсумки вже побудовано з наявних днів
  *   ct:usage             hash    id страви → { n, last } — «Нещодавні» й «Часті» в пошуку (server/usage.js)
  *   ct:usage:ready       string  позначка: лічильники вже побудовано з історії
+ *   ct:push              hash    endpoint → підписка пристрою на пуші (server/push.js)
+ *   ct:push:state        string  що й коли вже надіслано вечірнім кроном (shared/notify.js)
  *   ct:off:<запит>       string  FoodItem[] — кеш пошуку Open Food Facts, TTL 1 доба
  *
  * Один hash на день: знімок дня читається одним HGETALL,
@@ -43,6 +45,8 @@ export const KEYS = {
   summaryReady: 'ct:summary:ready',
   usage: 'ct:usage',
   usageReady: 'ct:usage:ready',
+  push: 'ct:push',
+  pushState: 'ct:push:state',
   /** @param {string} query нормалізований запит */
   offSearch: (query) => `ct:off:${query}`,
 }

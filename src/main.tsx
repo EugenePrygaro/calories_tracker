@@ -16,6 +16,7 @@ import './index.css'
 import App from './App.tsx'
 import { startAutoRefresh } from './data/store'
 import { prefetchSheets } from './features/lazySheets'
+import { resyncPush } from './lib/push'
 import { applyTheme, readCachedTheme } from './lib/theme'
 
 // Тема — до першого рендеру, щоб не блимала стандартна
@@ -33,6 +34,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && updateReady) void updateSW(true)
 })
 startAutoRefresh()
+void resyncPush() // раз на добу освіжає підписку на сповіщення (якщо ввімкнені)
 
 prefetchSheets()
 

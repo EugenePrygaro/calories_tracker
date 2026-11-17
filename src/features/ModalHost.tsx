@@ -1,6 +1,7 @@
 import { LoaderCircle } from 'lucide-react'
 import { Suspense, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
+import { useWakeLock } from '@/lib/wakeLock'
 import { useUiStore, type Modal as ModalState } from '@/store/ui'
 import {
   AchievementsSheet,
@@ -13,6 +14,9 @@ import {
   ShopSheet,
   StatsSheet,
 } from './lazySheets'
+
+/** Шторки, з якими стоять біля кухонної ваги: поки вони відкриті, екран не гасне. */
+const KEEP_AWAKE: ReadonlySet<ModalState['type']> = new Set(['add', 'edit', 'calc'])
 
 const TALL: ReadonlySet<ModalState['type']> = new Set(['add', 'body', 'achievements', 'shop', 'stats', 'calc'])
 
@@ -47,6 +51,7 @@ export function ModalHost() {
   // Тримаємо останню модалку, щоб вміст не зникав під час анімації закриття.
   const [shown, setShown] = useState(modal)
   if (modal && modal !== shown) setShown(modal)
+  useWakeLock(modal !== null && KEEP_AWAKE.has(modal.type))
 
   return (
     <Modal open={modal !== null} title={shown ? titleOf(shown) : ''} onClose={close} tall={!!shown && TALL.has(shown.type)}>

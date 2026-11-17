@@ -180,10 +180,26 @@ export const MAX_EDITS_COUNTED_PER_DAY = 3
 const DAILY_KCAL_CAP = 5000
 /** «День бабака»: скільки натискань «Скопіювати з учора» зараховується за день. */
 export const MAX_COPIES_COUNTED_PER_DAY = 5
+/**
+ * Момент, від якого рахувати «сьогодні/вчора» для нового запису: час його створення на телефоні,
+ * якщо він в офлайн-вікні (не старший за OFFLINE_WINDOW_DAYS і не з майбутнього), інакше — зараз.
+ * @param {number} createdAt @param {number} now
+ */
+export function rewardMoment(createdAt, now) {
+  const fresh = createdAt <= now + 5 * 60_000 && createdAt >= now - OFFLINE_WINDOW_DAYS * 86_400_000
+  return fresh ? Math.min(createdAt, now) : now
+}
+
 /** Скільки заморозок вміщає інвентар без розширень (див. shared/shop.js). */
 export const BASE_SHIELD_SLOTS = 2
 /** Скільки днів історії нагород тримати (нагороди лише за «сьогодні ± 1»). */
-const KEEP_DAYS = 7
+/**
+ * Записи з офлайн-черги приходять пізніше: нагороди за них рахуються від часу створення
+ * запису на телефоні, якщо він не старший за стільки днів (і не з майбутнього).
+ */
+export const OFFLINE_WINDOW_DAYS = 7
+/** Скільки днів тримати прапорці «вже нараховано» — з запасом на офлайн-вікно. */
+const KEEP_DAYS = OFFLINE_WINDOW_DAYS + 3
 
 /** @returns {Counters} */
 export function newCounters() {
@@ -380,6 +396,7 @@ export const withinGoal = (value, goal, tolerance) => goal > 0 && Math.abs(value
  *   tzOffset?: number,
  *   weightEdited?: boolean,
  *   copiedFromYesterday?: boolean,
+ *   at?: number,
  * }} DayContext
  */
 
@@ -492,7 +509,8 @@ export function applyDayProgress(state, ctx, events) {
 export function onEntrySaved(state, ctx, now = Date.now()) {
   /** @type {GameEvent[]} */
   const events = []
-  if (!isNearToday(ctx.date, now, ctx.tzOffset ?? 0)) return events
+  // «сьогодні/вчора» — відносно моменту запису (ctx.at — для черги офлайн-змін), а не приходу на сервер
+  if (!isNearToday(ctx.date, ctx.at ?? now, ctx.tzOffset ?? 0)) return events
 
   registerActivity(state, ctx.date, events)
   applyDayProgress(state, ctx, events)

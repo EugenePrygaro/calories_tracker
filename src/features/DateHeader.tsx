@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarCheck, ChevronLeft, ChevronRight, LoaderCircle, Settings } from 'lucide-react'
+import { CalendarCheck, ChevronLeft, ChevronRight, LoaderCircle, Settings, CloudUpload } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useDataStore } from '@/data/store'
+import { useDataStore, usePending } from '@/data/store'
 import { Hud } from '@/features/game/Hud'
 import { dateLabel, toDateKey } from '@/lib/date'
 import { useUiStore } from '@/store/ui'
@@ -24,6 +24,7 @@ function DateNav() {
   const goToday = useUiStore((s) => s.goToday)
   const openModal = useUiStore((s) => s.openModal)
   const saving = useDataStore((s) => s.saving > 0)
+  const pending = usePending()
   const isToday = date === toDateKey()
   const { title, subtitle } = dateLabel(date)
 
@@ -87,6 +88,22 @@ function DateNav() {
         className="card relative flex size-14 shrink-0 items-center justify-center rounded-full text-muted"
       >
         <Settings className="size-5" />
+        {/* офлайн-черга: зміни збережено на телефоні, чекають мережі */}
+        <AnimatePresence>
+          {pending > 0 && (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+              title={`Чекають мережі: ${pending}`}
+              aria-label={`Змін чекають мережі: ${pending}`}
+              className="absolute -top-1 -left-1 flex h-5 items-center gap-0.5 rounded-full bg-warning px-1.5 text-[10px] font-bold text-main shadow"
+            >
+              <CloudUpload className="size-3" />
+              {pending}
+            </motion.span>
+          )}
+        </AnimatePresence>
         {saving && (
           <LoaderCircle aria-label="Зберігається" className="absolute top-2 right-2 size-3.5 animate-spin text-primary" />
         )}

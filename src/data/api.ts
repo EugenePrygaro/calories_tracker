@@ -133,6 +133,12 @@ export const api = {
 
   getGame: () => request<{ game: GameState }>('GET', '/api/game'),
 
+  /** Пуш-сповіщення: публічний ключ VAPID і скільки пристроїв підписано. */
+  getPush: () => request<{ publicKey: string; subscribed: number }>('GET', '/api/push'),
+  savePush: (subscription: PushSubscriptionJSON, tzOffset: number) => request<{ ok: boolean }>('POST', '/api/push', { subscription, tzOffset }),
+  testPush: () => request<{ sent: number }>('POST', '/api/push', { action: 'test' }),
+  deletePush: (endpoint: string) => request<{ ok: boolean }>('DELETE', '/api/push', { endpoint }),
+
   /** Підсумки всіх днів із записами — для статистики й теплової карти. */
   getStats: () => request<{ days: DaySummary[] }>('GET', '/api/stats'),
 

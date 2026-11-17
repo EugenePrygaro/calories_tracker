@@ -355,3 +355,33 @@ test('API: claim і dev-дії', async () => {
   const reset = await call(game, { method: 'POST', body: { action: 'dev', op: 'reset' } })
   assert.equal(reset.body.game.coins, 0)
 })
+
+// ─── Офлайн-черга: нагороди за запізнілі записи ──────────────────────────────
+
+test('запис, створений офлайн 3 дні тому й синхронізований зараз, отримує нагороди свого дня', async () => {
+  const { rewardMoment } = await import('../shared/game.js')
+  const DAY = 86_400_000
+  const s = newGameState()
+  const date = '2026-11-11' // 3 дні тому від NOW (2026-11-14)
+  const createdAt = NOW - 3 * DAY
+  const events = onEntrySaved(s, { ...ctx({ date }), at: rewardMoment(createdAt, NOW) }, NOW)
+  assert.ok(events.some((e) => e.type === 'reward' && e.reason === 'meal'))
+  assert.equal(s.lastActiveDate, date)
+
+  // без офлайн-моменту (звичайне правило «сьогодні/вчора») — нічого
+  assert.deepEqual(onEntrySaved(newGameState(), ctx({ date }), NOW), [])
+  // поза вікном (8 днів) чи з майбутнього — момент «зараз»
+  assert.equal(rewardMoment(NOW - 8 * DAY, NOW), NOW)
+  assert.equal(rewardMoment(NOW + DAY, NOW), NOW)
+})
+
+test('офлайн-дні, синхронізовані по черзі, продовжують серію', async () => {
+  const { rewardMoment } = await import('../shared/game.js')
+  const DAY = 86_400_000
+  const s = newGameState()
+  for (const back of [4, 3, 2, 1, 0]) {
+    const date = new Date(NOW - back * DAY).toISOString().slice(0, 10)
+    onEntrySaved(s, { ...ctx({ date }), at: rewardMoment(NOW - back * DAY, NOW) }, NOW)
+  }
+  assert.equal(s.streak, 5)
+})

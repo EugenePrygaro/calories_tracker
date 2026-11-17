@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type MotionStyle } from 'framer-motion'
-import { Flame, Snowflake, Store, Trophy } from 'lucide-react'
+import { Flame, Store, Trophy } from 'lucide-react'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { CoinIcon } from '@/components/CoinIcon'
 import { useGame } from '@/data/store'
@@ -15,7 +15,6 @@ export function Hud() {
   const claimable = useClaimableCount()
   const coins = game?.coins ?? 0
   const streak = game?.streak ?? 0
-  const shields = game?.shields ?? 0
   const boosted = game?.boostDate === toDateKey()
 
   return (
@@ -75,7 +74,7 @@ export function Hud() {
 
       {/* Серія */}
       <span
-        title={`Днів поспіль: ${streak}${shields ? ` · заморозок: ${shields}` : ''}`}
+        title={`Днів поспіль: ${streak}`}
         className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-streak/10 px-3 text-base font-bold ring-1 ring-inset ring-streak/25"
       >
         <motion.span
@@ -88,12 +87,6 @@ export function Hud() {
           <Flame className={streak > 0 ? 'size-5 fill-streak/40 text-streak' : 'size-5 text-muted'} />
         </motion.span>
         {streak}
-        {shields > 0 && (
-          <span className="-mr-1 ml-1 flex items-center gap-0.5 rounded-full bg-shield/15 px-1.5 text-xs text-shield">
-            <Snowflake className="size-3" />
-            {shields}
-          </span>
-        )}
       </span>
 
       {/* Ачівки */}

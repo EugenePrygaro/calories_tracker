@@ -4,7 +4,7 @@
 import { DATE_RE, MEAL_TYPES } from '../shared/model.js'
 import { goalsForDate } from '../shared/goals.js'
 import { sum } from '../shared/nutrition.js'
-import { BASE_SHIELD_SLOTS, COUNTER_KEYS, dayDiff, grant, isNearToday, localToday, newDayAwards, newGameState, onEntrySaved, trackHoldings } from '../shared/game.js'
+import { BASE_SHIELD_SLOTS, COUNTER_KEYS, dayDiff, rewardMoment, grant, isNearToday, localToday, newDayAwards, newGameState, onEntrySaved, trackHoldings } from '../shared/game.js'
 import { ID_ALIASES, isAchievementId } from '../shared/achievements.js'
 import { DEFAULT_THEME, MAX_SHIELD_SLOTS, isThemeId } from '../shared/shop.js'
 import { obj, sanitizeEntry, sanitizeProfile } from '../shared/validate.js'
@@ -124,7 +124,9 @@ function storedEntry(value) {
  */
 export async function processEntrySaved(r, entry, existing, opts, now = Date.now()) {
   // Записи не за «сьогодні/вчора» гру не чіпають — не витрачаємо команди Redis
-  if (!isNearToday(entry.date, now, opts.tzOffset)) return { game: await loadGame(r), events: [] }
+  // новий запис із черги офлайн-змін — нагороди від часу його створення (див. rewardMoment)
+  const at = existing ? now : rewardMoment(entry.createdAt, now)
+  if (!isNearToday(entry.date, at, opts.tzOffset)) return { game: await loadGame(r), events: [] }
 
   const [rawGame, rawDay, rawProfile] = await Promise.all([
     r.get(KEYS.game),
@@ -156,6 +158,7 @@ export async function processEntrySaved(r, entry, existing, opts, now = Date.now
       goals,
       entry,
       tzOffset: opts.tzOffset,
+      at,
       copiedFromYesterday: opts.copiedFromYesterday,
       // «Ювелірна точність»: змінили вагу вже доданої страви
       weightEdited: !!existing && existing.mode === 'weight' && entry.mode === 'weight' && existing.grams !== entry.grams,

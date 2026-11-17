@@ -7,6 +7,7 @@ import { gameAction, useDataStore, useGame } from '@/data/store'
 import { GROUP_ORDER, GROUPS } from '@/features/game/achievementStyle'
 import { ALL_THEMES, THEME_LOOK } from '@/features/game/themeStyle'
 import { toDateKey } from '@/lib/date'
+import { SOUND_LABELS, play, type SoundName } from '@/lib/sound'
 import { useGameUi } from '@/store/gameUi'
 import { useUiStore } from '@/store/ui'
 
@@ -96,6 +97,14 @@ function GameDev() {
         <B onClick={() => run('setStreak', 6)} busy={busy}>Стрік = 6</B>
         <B onClick={() => run('setStreak', 29)} busy={busy}>Стрік = 29</B>
         <B onClick={() => run('setStreak', 0)} busy={busy}>Стрік = 0</B>
+      </Group>
+
+      <Group title="Звуки">
+        {(Object.keys(SOUND_LABELS) as SoundName[]).map((name) => (
+          <B key={name} onClick={() => play(name)} busy={false}>
+            {SOUND_LABELS[name]}
+          </B>
+        ))}
       </Group>
 
       <Group title="Тема (перегляд без покупки, лише тут)">

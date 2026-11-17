@@ -6,6 +6,8 @@ import { CoinIcon } from '@/components/CoinIcon'
 import { ProgressBar } from '@/components/ProgressBar'
 import { claimAchievementReward, dismissAchievement, useFoods, useGame } from '@/data/store'
 import { int } from '@/lib/format'
+import { useOnline } from '@/lib/online'
+import { play } from '@/lib/sound'
 import { useSheetFlag } from '@/lib/sheetFlag'
 import { useUiStore } from '@/store/ui'
 import { AchievementIcon } from './AchievementIcon'
@@ -44,10 +46,12 @@ function UnlockCard({ a, progress }: { a: Achievement; progress: { current: numb
   const g = GROUPS[a.group]
   const tier = TIERS[a.tier]
   const [busy, setBusy] = useState(false)
+  const online = useOnline()
   useSheetFlag(true)
 
   useEffect(() => {
     const colors = [cssColor(g.color), cssColor('var(--coin)'), '#ffffff']
+    play('achievement')
     void import('canvas-confetti').then(({ default: confetti }) =>
       confetti({ particleCount: 70, spread: 80, startVelocity: 42, origin: { x: 0.5, y: 0.42 }, colors, zIndex: 95, disableForReducedMotion: true }),
     )
@@ -165,12 +169,12 @@ function UnlockCard({ a, progress }: { a: Achievement; progress: { current: numb
         <motion.button
           type="button"
           onClick={claim}
-          disabled={busy}
+          disabled={busy || !online}
           whileTap={{ scale: 0.97 }}
           autoFocus
           className="bg-accent-gradient glow relative mt-5 h-12 w-full rounded-2xl font-bold text-white disabled:opacity-60"
         >
-          Забрати нагороду
+          {online ? 'Забрати нагороду' : 'Потрібен інтернет'}
         </motion.button>
         <button
           type="button"

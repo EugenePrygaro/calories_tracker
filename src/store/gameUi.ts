@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { GameEvent } from '@shared/game.js'
 import { isThemeId, type ThemeId } from '@shared/shop.js'
+import { playForEvents } from '@/lib/sound'
 import type { AppTheme } from '@/lib/theme'
 
 /**
@@ -27,6 +28,8 @@ interface GameUiState {
   endTryOn: () => void
   setRevealIcons: (value: boolean) => void
   push: (events: readonly GameEvent[]) => void
+  /** лише тости, без звуку */
+  pushToasts: (events: readonly GameEvent[]) => void
   removeToast: (id: number) => void
   /** Інформаційна підказка в стрічці нагород */
   info: (label: string) => void
@@ -56,7 +59,7 @@ function readPreview(): AppTheme | null {
   }
 }
 
-export const useGameUi = create<GameUiState>()((set) => ({
+export const useGameUi = create<GameUiState>()((set, get) => ({
   toasts: [],
   revealIcons: readReveal(),
   themePreview: readPreview(),
@@ -81,7 +84,11 @@ export const useGameUi = create<GameUiState>()((set) => ({
     set({ revealIcons: value })
   },
 
-  push: (events) =>
+  push: (events) => {
+    playForEvents(events)
+    get().pushToasts(events)
+  },
+  pushToasts: (events) =>
     set((s) => {
       const toasts: RewardToast[] = []
       for (const e of events) {
