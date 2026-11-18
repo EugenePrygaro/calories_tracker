@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "npm run build && node scripts/dev.mjs --preview",
     "typecheck": "tsc -b",
-    "icons": "pwa-assets-generator --preset minimal-2023 public/favicon.svg",
+    "icons": "pwa-assets-generator",
     "dev:vercel": "vercel dev",
     "test": "node --test tests/*.test.js",
     "seed": "node scripts/seed.mjs"
