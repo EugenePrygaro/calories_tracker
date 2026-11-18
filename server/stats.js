@@ -15,7 +15,7 @@ import { KEYS, parseStored } from './store.js'
 /** @typedef {import('../shared/model.js').Profile | null} ProfileOrNull */
 
 /** @param {RedisClient} r @returns {Promise<ProfileOrNull>} */
-async function currentProfile(r) {
+export async function currentProfile(r) {
   try {
     return sanitizeProfile(parseStored(await r.get(KEYS.profile)))
   } catch {
@@ -23,8 +23,8 @@ async function currentProfile(r) {
   }
 }
 
-/** @param {Record<string, unknown> | null} raw */
-function entriesOf(raw) {
+/** Записи дня з Redis (биті пропускаємо). @param {Record<string, unknown> | null} raw */
+export function entriesOf(raw) {
   return Object.values(raw ?? {}).flatMap((v) => {
     try {
       return [sanitizeEntry(parseStored(v))]

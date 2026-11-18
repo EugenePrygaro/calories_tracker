@@ -1,4 +1,4 @@
-import { ChevronRight, History, LoaderCircle, PencilLine, RotateCcw, ScanBarcode, Search, X } from 'lucide-react'
+import { Camera, ChevronRight, History, LoaderCircle, PencilLine, RotateCcw, ScanBarcode, Search, X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { LIMITS, type FoodItem } from '@shared/model.js'
 import { Button } from '@/components/ui/Button'
@@ -9,6 +9,7 @@ import { addDays } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { useUiStore } from '@/store/ui'
 import { FoodRow } from './FoodRow'
+import { LabelPhotoButton } from './LabelPhoto'
 
 interface SearchStepProps {
   query: string
@@ -16,6 +17,8 @@ interface SearchStepProps {
   onPick: (item: FoodItem) => void
   onManual: () => void
   onScan: () => void
+  /** Фото етикетки → Gemini заповнить калорії й БЖВ (без ключа на сервері кнопка підкаже, як увімкнути) */
+  onPhoto: (file: File) => void
   onYesterday: () => void
 }
 
@@ -28,7 +31,7 @@ const SORTS: { value: Sort; label: string }[] = [
 /** Скільки страв показувати в «Нещодавні» / «Часті». */
 const TOP = 15
 
-export function SearchStep({ query, onQuery, onPick, onManual, onScan, onYesterday }: SearchStepProps) {
+export function SearchStep({ query, onQuery, onPick, onManual, onScan, onPhoto, onYesterday }: SearchStepProps) {
   const foods = useFoods()
   const foodsLoaded = useDataStore((s) => s.foodsLoaded)
   const usage = useDataStore((s) => s.foodUsage)
@@ -57,8 +60,8 @@ export function SearchStep({ query, onQuery, onPick, onManual, onScan, onYesterd
   return (
     <div className="flex flex-1 flex-col">
       <div className="sticky top-0 z-10 -mx-5 bg-card px-5 pb-3">
-        <label className="flex h-12 items-center gap-2 rounded-xl border border-line bg-elevated px-3 focus-within:border-primary">
-          <Search className="size-5 shrink-0 text-muted" />
+        <label className="flex h-[58px] items-center gap-2.5 rounded-[14px] border border-line bg-elevated px-3.5 focus-within:border-primary">
+          <Search className="size-6 shrink-0 text-muted" />
           <input
             type="search"
             enterKeyHint="search"
@@ -66,20 +69,27 @@ export function SearchStep({ query, onQuery, onPick, onManual, onScan, onYesterd
             value={query}
             onChange={(e) => onQuery(e.target.value)}
             placeholder="Пошук страви або продукту"
-            className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-muted/60 [&::-webkit-search-cancel-button]:hidden"
+            className="w-full min-w-0 bg-transparent text-[19px] outline-none placeholder:text-muted/60 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button type="button" aria-label="Очистити" onClick={() => onQuery('')} className="p-1 text-muted">
-              <X className="size-5" />
+              <X className="size-6" />
             </button>
           )}
+          <LabelPhotoButton
+            onFile={onPhoto}
+            label="Сфотографувати етикетку"
+            className="flex size-[43px] shrink-0 items-center justify-center rounded-[10px] bg-primary/15 text-primary active:bg-primary/25"
+          >
+            <Camera className="size-6" />
+          </LabelPhotoButton>
           <button
             type="button"
             aria-label="Сканувати штрихкод"
             onClick={onScan}
-            className="-mr-1.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary active:bg-primary/25"
+            className="-mr-2 flex size-[43px] shrink-0 items-center justify-center rounded-[10px] bg-primary/15 text-primary active:bg-primary/25"
           >
-            <ScanBarcode className="size-5" />
+            <ScanBarcode className="size-6" />
           </button>
         </label>
       </div>

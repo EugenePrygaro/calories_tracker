@@ -12,6 +12,18 @@ import { MemoryRedis } from './memory-redis.js'
 import { MOCK_TARGET_WEIGHT, mockBody, mockEntries, mockFoods, mockHistory, todayKey } from './mock-data.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+// Локальні секрети (напр. GEMINI_API_KEY для фото етикетки) — з .env.local чи .env, якщо є.
+// Обидва в .gitignore; змінні, задані в терміналі, мають перевагу.
+for (const file of ['.env.local', '.env']) {
+  try {
+    process.loadEnvFile(path.join(root, file))
+    console.log(`  ➜  Змінні з ${file}`)
+  } catch {
+    // файлу немає — працюємо без нього
+  }
+}
+
 const dataFile = process.env.DEV_DATA_FILE || path.join(root, '.data', 'dev-redis.json')
 const store = new MemoryRedis(dataFile)
 setRedisClient(store)

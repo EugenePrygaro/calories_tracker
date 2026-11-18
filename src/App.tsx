@@ -15,6 +15,7 @@ import { StreakNotice } from '@/features/game/StreakNotice'
 import { DevPanel } from '@/features/lazySheets'
 import { MealSection } from '@/features/MealSection'
 import { FoodsCard } from '@/features/foods/FoodsCard'
+import { InsightsCard } from '@/features/insights/InsightsCard'
 import { StatsCard } from '@/features/stats/StatsCard'
 import { ModalHost } from '@/features/ModalHost'
 import { cn } from '@/lib/cn'
@@ -126,14 +127,18 @@ export default function App() {
 
       {/* Особисті параметри — не залежать від дня, тому поза каруселлю днів */}
       {/* below-fold: content-visibility — браузер пропускає верстку й малювання, поки не догорнули */}
-      <motion.div custom={5} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_420px] [content-visibility:auto]">
+      {/* Порядок: мої страви → мої параметри → як іде схуднення → статистика */}
+      <motion.div custom={5} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_120px] [content-visibility:auto]">
+        <FoodsCard />
+      </motion.div>
+      <motion.div custom={6} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_420px] [content-visibility:auto]">
         <BodyCard />
       </motion.div>
-      <motion.div custom={6} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_260px] [content-visibility:auto]">
-        <StatsCard />
+      <motion.div custom={7} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_160px] [content-visibility:auto]">
+        <InsightsCard />
       </motion.div>
-      <motion.div custom={7} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_120px] [content-visibility:auto]">
-        <FoodsCard />
+      <motion.div custom={8} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_260px] [content-visibility:auto]">
+        <StatsCard />
       </motion.div>
 
       {/* Калькулятор порцій — ліворуч, удвічі менший за «плюс» і на одній з ним осі */}

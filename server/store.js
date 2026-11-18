@@ -15,6 +15,8 @@
  *   ct:push:state        string  що й коли вже надіслано вечірнім кроном (shared/notify.js)
  *   ct:search:<запит>    string  FoodItem[] — кеш публічного пошуку (Сільпо, Zakaz.ua, OFF), TTL 1 доба
  *   ct:ean:<штрихкод>    string  FoodItem[] (0 або 1) — кеш пошуку за штрихкодом, TTL 30 діб (не знайдено — доба)
+ *   ct:foodmix:<дата>    string  FoodBreakdown — що дає найбільше калорій за 28 днів до дати, TTL 1 доба
+ *   ct:ai:count:<дата>   string  скільки разів сьогодні викликали Gemini (денний ліміт), TTL 2 доби
  *
  * Один hash на день: знімок дня читається одним HGETALL,
  * а зміна чи видалення запису — один HSET / HDEL.
@@ -52,6 +54,10 @@ export const KEYS = {
   search: (query) => `ct:search:${query}`,
   /** @param {string} ean canonicalEan */
   ean: (ean) => `ct:ean:${ean}`,
+  /** @param {string} date */
+  foodMix: (date) => `ct:foodmix:${date}`,
+  /** @param {string} date */
+  aiCount: (date) => `ct:ai:count:${date}`,
 }
 
 /** @type {RedisClient | null} */

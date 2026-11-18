@@ -2,6 +2,19 @@ import type { GameEvent, GameState } from '@shared/game.js'
 import type { BodyRecord, Entry, Food, FoodItem, Profile } from '@shared/model.js'
 import type { ShopItemId, ThemeId, UsableItemId } from '@shared/shop.js'
 import type { DaySummary } from '@shared/stats.js'
+import type { FoodBreakdown } from '@shared/insights.js'
+
+/** Що Gemini прочитав з фото етикетки (api/ai.js). found: false — харчової цінності на фото не видно. */
+export interface LabelReading {
+  found: boolean
+  name: string
+  brand: string | null
+  per100: { kcal: number; protein: number; fat: number; carbs: number } | null
+  packageGrams: number | null
+  confidence: 'high' | 'medium' | 'low'
+  note: string
+}
+
 
 /** Скільки разів і коли востаннє додавали страву (для «Нещодавні» / «Часті»). */
 export interface FoodUsage {
@@ -52,8 +65,8 @@ export class NetworkError extends Error {
 }
 
 /** Таймаут + скасування; AbortSignal.any є лише в нових браузерах (iOS 17.4+) — інакше лише сигнал скасування. */
-function requestSignal(signal?: AbortSignal): AbortSignal | undefined {
-  const timeout = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(15_000) : undefined
+function requestSignal(signal?: AbortSignal, timeoutMs = 15_000): AbortSignal | undefined {
+  const timeout = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined
   if (!signal) return timeout
   if (!timeout) return signal
   return typeof AbortSignal.any === 'function' ? AbortSignal.any([timeout, signal]) : signal
@@ -63,13 +76,15 @@ interface RequestOptions {
   signal?: AbortSignal
   /** 'default' — дозволити кеш браузера (пошук кешується сервером на годину) */
   cache?: RequestCache
+  /** Довше за звичайні 15 с — для AI (Gemini читає фото кілька секунд, на сервері ліміт 30 с) */
+  timeoutMs?: number
 }
 
 async function request<T>(method: string, path: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {
   // Часовий пояс — серверу: «сьогодні» і ачівки за місцевим часом («Рання пташка», «Нічний дожор»).
   const headers: Record<string, string> = { 'X-TZ-Offset': String(new Date().getTimezoneOffset()) }
   const init: RequestInit = { method, cache: opts.cache ?? 'no-store', headers }
-  const signal = requestSignal(opts.signal)
+  const signal = requestSignal(opts.signal, opts.timeoutMs)
   if (signal) init.signal = signal
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
@@ -151,6 +166,19 @@ export const api = {
     request<{ results: FoodItem[] }>('GET', `/api/search?q=${q(query)}`, undefined, {
       ...(signal ? { signal } : {}),
       cache: 'default',
+    }),
+
+  /** Що дає найбільше калорій за 28 днів до дати (кеш на сервері на добу). */
+  getFoodMix: (today: string) => request<{ foods: FoodBreakdown }>('GET', `/api/stats?foods=${q(today)}`),
+
+  /** Чи налаштовано AI на сервері (є ключ Gemini) і скільки викликів лишилось сьогодні. */
+  aiStatus: () => request<{ configured: boolean; left: number }>('GET', '/api/ai'),
+
+  /** Фото етикетки → назва, КБЖВ на 100 г, вага упаковки (Gemini). image — base64 без префікса. */
+  readLabel: (image: string, mimeType: string, signal?: AbortSignal) =>
+    request<{ label: LabelReading; left: number }>('POST', '/api/ai', { action: 'label', image, mimeType }, {
+      ...(signal ? { signal } : {}),
+      timeoutMs: 35_000,
     }),
 
   /** Продукт за штрихкодом (сканер): ті самі джерела, перший знайдений; [] — ніде немає. */

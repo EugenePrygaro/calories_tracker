@@ -16,6 +16,7 @@ export type Modal =
   /** «Мої страви»; з foodId — одразу редагування цієї страви */
   | { type: 'foods'; foodId?: string }
   | { type: 'streak' }
+  | { type: 'insights' }
 
 interface Toast {
   id: number

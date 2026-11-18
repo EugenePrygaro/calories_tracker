@@ -9,6 +9,7 @@ import { latestMeasure, startWeight, targetProgress, weightSeries, type Measure 
 import { cn } from '@/lib/cn'
 import { fromDateKey } from '@/lib/date'
 import { cm, kg, signed } from '@/lib/format'
+import { forecastLabel, useInsights } from '@/lib/insights'
 import { useUiStore } from '@/store/ui'
 
 const MEASURES: BodyField[] = ['chest', 'waist', 'hips']
@@ -22,6 +23,9 @@ export function BodyCard() {
 
   const weight = latestMeasure(records, 'weight')
   const start = startWeight(records)
+  // темп за трендом ваги (а не різниця двох зважувань) і коли буде ціль
+  const { trend, forecast } = useInsights()
+  const forecastText = forecastLabel(forecast)
   const spark = weightSeries(records).slice(-20)
 
   // Рух ваги «в правильний бік» — до цілі; без цілі тренд нейтральний.
@@ -89,6 +93,19 @@ export function BodyCard() {
             </div>
             <Sparkline values={spark.map((p) => p.value)} className="ml-auto h-16 flex-1" />
           </div>
+
+          {trend && (
+            <p className="pointer-events-none -mb-1 flex items-center gap-1.5 text-xs text-muted">
+              {trend.perWeek <= 0 ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+              <span>
+                <b className="text-fg">
+                  {trend.perWeek < 0 ? '−' : '+'}
+                  {Math.abs(trend.perWeek).toLocaleString('uk-UA', { maximumFractionDigits: 2 })} кг/тиж
+                </b>
+                {forecastText && ` · ${forecastText}`}
+              </span>
+            </p>
+          )}
 
           {target !== null && start !== null ? (
             <TargetProgress current={weight.value} start={start} target={target} />

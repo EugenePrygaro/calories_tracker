@@ -31,7 +31,7 @@ const CACHE_TTL_SEC = 24 * 60 * 60
 const SHORT_TTL_SEC = 10 * 60
 /** Менше стількох результатів — питаємо наступне джерело. */
 const MIN_RESULTS = 5
-/** Запас до ліміту функції (maxDuration 10 с у vercel.json). */
+/** Бюджет пошуку: користувач не має чекати довше (ліміт функції — maxDuration у vercel.json). */
 const BUDGET_MS = 8500
 
 /**

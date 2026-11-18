@@ -11,6 +11,7 @@ import {
   CalendarSheet,
   EditEntryForm,
   FoodsSheet,
+  InsightsSheet,
   GoalsForm,
   ShopSheet,
   StatsSheet,
@@ -20,7 +21,7 @@ import {
 /** Шторки, з якими стоять біля кухонної ваги: поки вони відкриті, екран не гасне. */
 const KEEP_AWAKE: ReadonlySet<ModalState['type']> = new Set(['add', 'edit', 'calc'])
 
-const TALL: ReadonlySet<ModalState['type']> = new Set(['add', 'body', 'achievements', 'shop', 'stats', 'calc', 'foods'])
+const TALL: ReadonlySet<ModalState['type']> = new Set(['add', 'body', 'achievements', 'shop', 'stats', 'calc', 'foods', 'insights'])
 
 function titleOf(m: ModalState): string {
   switch (m.type) {
@@ -46,6 +47,8 @@ function titleOf(m: ModalState): string {
       return 'Мої страви'
     case 'streak':
       return 'Серія'
+    case 'insights':
+      return 'Як іде схуднення'
   }
 }
 
@@ -82,6 +85,7 @@ export function ModalHost() {
       {shown?.type === 'calendar' && <CalendarSheet onDone={close} />}
       {shown?.type === 'foods' && <FoodsSheet key={shown.foodId ?? 'list'} foodId={shown.foodId} />}
       {shown?.type === 'streak' && <StreakSheet />}
+      {shown?.type === 'insights' && <InsightsSheet />}
       </Suspense>
     </Modal>
   )

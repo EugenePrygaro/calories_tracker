@@ -2,10 +2,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft } from 'lucide-react'
 import { useState } from 'react'
 import { MEAL_LABELS, MEAL_TYPES, type FoodItem, type MealType } from '@shared/model.js'
+import type { LabelReading } from '@/data/api'
 import { Segmented } from '@/components/ui/Segmented'
 import { haptic } from '@/lib/haptics'
 import { FoodEditor } from '../foods/FoodEditor'
 import { ManualStep } from './ManualStep'
+import { LabelStep } from './LabelPhoto'
 import { PortionStep } from './PortionStep'
 import { ScanStep } from './ScanStep'
 import { SearchStep } from './SearchStep'
@@ -15,8 +17,9 @@ type Step =
   | { type: 'search' }
   | { type: 'portion'; item: FoodItem }
   | { type: 'editFood'; item: FoodItem }
-  | { type: 'manual'; barcode?: string }
+  | { type: 'manual'; barcode?: string; prefill?: LabelReading }
   | { type: 'scan' }
+  | { type: 'label'; file: File }
   | { type: 'yesterday' }
 
 const MEAL_OPTIONS = MEAL_TYPES.map((m) => ({ value: m, label: MEAL_LABELS[m] }))
@@ -85,6 +88,7 @@ export function AddFoodSheet({ initialMeal, onDone }: { initialMeal: MealType; o
               onPick={(item) => go({ type: 'portion', item })}
               onManual={() => go({ type: 'manual' })}
               onScan={() => go({ type: 'scan' })}
+              onPhoto={(file) => go({ type: 'label', file })}
               onYesterday={() => go({ type: 'yesterday' })}
             />
           )}
@@ -106,9 +110,17 @@ export function AddFoodSheet({ initialMeal, onDone }: { initialMeal: MealType; o
           {step.type === 'manual' && (
             <ManualStep
               meal={meal}
-              initialName={step.barcode ? '' : query.trim()}
+              initialName={step.barcode || step.prefill ? '' : query.trim()}
               barcode={step.barcode}
+              prefill={step.prefill}
               onDone={onDone}
+            />
+          )}
+          {step.type === 'label' && (
+            <LabelStep
+              file={step.file}
+              onRead={(prefill) => go({ type: 'manual', prefill })}
+              onManual={() => go({ type: 'manual' })}
             />
           )}
           {step.type === 'scan' && (
