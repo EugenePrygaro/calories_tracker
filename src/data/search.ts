@@ -19,7 +19,7 @@ export function filterFoods(foods: readonly Food[], query: string): Food[] {
   return scored.sort((a, b) => a.score - b.score || b.f.updatedAt - a.f.updatedAt).map((s) => s.f)
 }
 
-export type OffSearch =
+export type PublicSearch =
   | { status: 'idle'; results: [] }
   | { status: 'loading'; results: [] }
   | { status: 'done'; results: FoodItem[] }
@@ -29,8 +29,8 @@ const DEBOUNCE_MS = 350
 /** Кеш на час сесії: повернення до того ж запиту — без мережі. */
 const cache = new Map<string, FoodItem[]>()
 
-/** Пошук в Open Food Facts з дебаунсом і скасуванням застарілих запитів. */
-export function useOffSearch(query: string): OffSearch {
+/** Публічний пошук (Сільпо, Zakaz.ua, Open Food Facts) з дебаунсом і скасуванням застарілих запитів. */
+export function usePublicSearch(query: string): PublicSearch {
   const q = normalizeQuery(query)
   const valid = q.length >= LIMITS.searchQuery.min
   const [failed, setFailed] = useState<{ q: string; attempt: number } | null>(null)

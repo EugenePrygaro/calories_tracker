@@ -6,7 +6,8 @@
  * Склеювання (за ключем об'єкта):
  *   - кілька збережень одного запису → лише останнє (але «новий» і foodId/source першого лишаються);
  *   - запис створили й видалили офлайн → на сервер не йде нічого;
- *   - видалили, а потім повернули → лише збереження.
+ *   - видалили, а потім повернули → лише збереження;
+ *   - страву змінили й видалили → лише видалення (і навпаки: остання дія перемагає).
  */
 
 /** @typedef {import('./model.js').Entry} Entry */
@@ -22,6 +23,7 @@
  *   | { kind: 'putBody', key: string, record: BodyRecord }
  *   | { kind: 'deleteBody', key: string, date: string }
  *   | { kind: 'putFood', key: string, food: Food }
+ *   | { kind: 'deleteFood', key: string, id: string }
  * )} OutboxOp
  */
 
@@ -100,7 +102,10 @@ export function overlayDay(entries, date, queue) {
 /** @param {readonly Food[]} foods @param {readonly OutboxOp[]} queue @returns {Food[]} */
 export function overlayFoods(foods, queue) {
   let out = [...foods]
-  for (const op of queue) if (op.kind === 'putFood') out = [...out.filter((f) => f.id !== op.food.id), op.food]
+  for (const op of queue) {
+    if (op.kind === 'putFood') out = [...out.filter((f) => f.id !== op.food.id), op.food]
+    else if (op.kind === 'deleteFood') out = out.filter((f) => f.id !== op.id)
+  }
   return out.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 

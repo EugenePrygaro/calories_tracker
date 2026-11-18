@@ -1,14 +1,17 @@
-import { Trash2 } from 'lucide-react'
+import { CopyPlus, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
-import { LIMITS, type Entry } from '@shared/model.js'
+import { LIMITS, type Entry, type EntryPortion } from '@shared/model.js'
 import { scale } from '@shared/nutrition.js'
 import { Button } from '@/components/ui/Button'
 import { Field, NumberField } from '@/components/ui/Field'
 import { GramsField } from '@/components/ui/GramsField'
 import { SheetFooter } from '@/components/ui/Modal'
-import { removeEntry, updateEntry, useEntry, type EntryPatch } from '@/data/store'
+import { addEntry, removeEntry, updateEntry, useEntry, type EntryDraft, type EntryPatch } from '@/data/store'
+import { useUiStore } from '@/store/ui'
 import { grams, kcal, parseNum } from '@/lib/format'
 import { NutrientsPreview } from './NutrientsPreview'
+import { PortionCounter } from './add/Portions'
+import { portionGrams } from './add/portionMath'
 
 interface EditEntryFormProps {
   date: string
@@ -48,14 +51,43 @@ function remove(entry: Entry, onDone: () => void) {
   onDone()
 }
 
+/**
+ * «Ще раз»: та сама страва з тією самою вагою — новим записом у той самий прийом їжі.
+ * Звичайне додавання, не «копія з учора» (та рахується для ачівки «День бабака»).
+ */
+function again(entry: Entry, onDone: () => void) {
+  const { date, meal, name } = entry
+  const draft: EntryDraft =
+    entry.mode === 'weight' && entry.per100 && entry.grams !== null
+      ? { mode: 'weight', date, meal, name, grams: entry.grams, per100: entry.per100, portion: entry.portion ?? null }
+      : { mode: 'quick', date, meal, name, kcal: entry.kcal, protein: entry.protein, fat: entry.fat, carbs: entry.carbs }
+  void addEntry(draft).catch(() => {}) // помилку покаже тост
+  useUiStore.getState().showToast(`Додано ще раз «${entry.name}»`, { tone: 'info' })
+  onDone()
+}
+
 function WeightEdit({ entry, per100, onDone }: { entry: Entry; per100: Entry['per100'] & {}; onDone: () => void }) {
   const [value, setValue] = useState(String(entry.grams ?? ''))
+  // запис додали порцією — міняємо кількість порцій; вага однієї — з самого запису
+  const [portion, setPortion] = useState<EntryPortion | null>(entry.portion ?? null)
+  const unitGrams = entry.portion && entry.grams ? entry.grams / entry.portion.count : null
   const g = parseNum(value)
   const valid = inRange(g, LIMITS.grams.min, LIMITS.grams.max)
 
+  const setCount = (count: number) => {
+    if (!portion || unitGrams === null) return
+    setPortion({ ...portion, count })
+    setValue(String(portionGrams(unitGrams, count)))
+  }
+  /** Грами змінили вручну — запис більше не порцією. */
+  const setGrams = (v: string) => {
+    setPortion(null)
+    setValue(v)
+  }
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (valid) commit(entry, { grams: g }, onDone)
+    if (valid) commit(entry, { grams: g, portion }, onDone)
   }
 
   return (
@@ -67,9 +99,12 @@ function WeightEdit({ entry, per100, onDone }: { entry: Entry; per100: Entry['pe
           {grams(per100.carbs)}
         </p>
       </div>
-      <GramsField label="Вага порції" value={value} onChange={setValue} autoFocus />
+      {portion && unitGrams !== null && (
+        <PortionCounter unit={portion.unit} unitGrams={unitGrams} count={portion.count} onChange={setCount} />
+      )}
+      <GramsField label="Вага порції" value={value} onChange={setGrams} autoFocus={!entry.portion} />
       <NutrientsPreview value={scale(per100, valid ? g : 0)} />
-      <Actions valid={valid} onDelete={() => remove(entry, onDone)} />
+      <Actions valid={valid} onDelete={() => remove(entry, onDone)} onAgain={() => again(entry, onDone)} />
     </form>
   )
 }
@@ -116,16 +151,19 @@ function QuickEdit({ entry, onDone }: { entry: Entry; onDone: () => void }) {
         <NumberField label="Жири" suffix="г" value={f.fat} onChange={set('fat')} />
         <NumberField label="Вуглеводи" suffix="г" value={f.carbs} onChange={set('carbs')} />
       </div>
-      <Actions valid={valid} onDelete={() => remove(entry, onDone)} />
+      <Actions valid={valid} onDelete={() => remove(entry, onDone)} onAgain={() => again(entry, onDone)} />
     </form>
   )
 }
 
-function Actions({ valid, onDelete }: { valid: boolean; onDelete: () => void }) {
+function Actions({ valid, onDelete, onAgain }: { valid: boolean; onDelete: () => void; onAgain: () => void }) {
   return (
     <SheetFooter>
       <Button variant="danger" onClick={onDelete} aria-label="Видалити запис">
         <Trash2 className="size-5" />
+      </Button>
+      <Button variant="ghost" onClick={onAgain} aria-label="Додати ще раз" className="px-4">
+        <CopyPlus className="size-5" /> Ще раз
       </Button>
       <Button type="submit" disabled={!valid} className="flex-1">
         Зберегти

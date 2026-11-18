@@ -4,12 +4,15 @@
  * зберегти те, що сервер потім відхилить.
  */
 import {
+  CATALOG_CODE_RE,
+  CATALOG_SOURCES,
+  canonicalEan,
   DATE_RE,
   DEFAULT_GOALS,
   ID_RE,
   LIMITS,
   MEAL_TYPES,
-  OFF_CODE_RE,
+  PORTION_UNITS,
   QUICK_ADD_NAME,
 } from './model.js'
 import { round1, scale } from './nutrition.js'
@@ -17,6 +20,9 @@ import { DEFAULT_WEEKEND_BOOST } from './goals.js'
 
 /** @typedef {import('./model.js').Entry} Entry */
 /** @typedef {import('./model.js').Food} Food */
+/** @typedef {import('./model.js').Portion} Portion */
+/** @typedef {import('./model.js').EntryPortion} EntryPortion */
+/** @typedef {import('./model.js').PortionUnit} PortionUnit */
 /** @typedef {import('./model.js').Goals} Goals */
 /** @typedef {import('./model.js').Profile} Profile */
 /** @typedef {import('./model.js').MealType} MealType */
@@ -123,7 +129,8 @@ export function sanitizeEntry(input) {
     if (!name) throw new ValidationError('name')
     const grams = num(o.grams, 'grams', LIMITS.grams.min, LIMITS.grams.max)
     const per100 = sanitizePer100(o.per100)
-    return { ...base, mode: 'weight', name, grams, per100, ...scale(per100, grams) }
+    const portion = sanitizeEntryPortion(o.portion)
+    return { ...base, mode: 'weight', name, grams, per100, ...scale(per100, grams), ...(portion ? { portion } : {}) }
   }
 
   if (o.mode === 'quick') {
@@ -144,6 +151,43 @@ export function sanitizeEntry(input) {
 }
 
 /**
+ * Порція запису («2 штуки»), або null — запис у грамах.
+ * @param {unknown} input
+ * @returns {EntryPortion | null}
+ */
+export function sanitizeEntryPortion(input) {
+  if (isBlank(input)) return null
+  const o = obj(input)
+  const unit = PORTION_UNITS.find((u) => u === o.unit)
+  if (!unit) throw new ValidationError('portion')
+  const { min, max } = LIMITS.portionCount
+  return { unit, count: num(o.count, 'portion', min, max) }
+}
+
+/**
+ * Порції страви: відомі одиниці, грами в межах ваги порції; повтор одиниці — перемагає остання.
+ * Порядок — як у PORTION_UNITS, щоб однакові набори порцій виглядали однаково.
+ * @param {unknown} input
+ * @returns {Portion[]}
+ */
+export function sanitizePortions(input) {
+  if (isBlank(input)) return []
+  if (!Array.isArray(input) || input.length > PORTION_UNITS.length * 2) throw new ValidationError('portions')
+  /** @type {Map<PortionUnit, number>} */
+  const byUnit = new Map()
+  for (const p of input) {
+    const o = obj(p)
+    const unit = PORTION_UNITS.find((u) => u === o.unit)
+    if (!unit) throw new ValidationError('portions')
+    byUnit.set(unit, num(o.grams, 'portions', LIMITS.grams.min, LIMITS.grams.max))
+  }
+  return PORTION_UNITS.flatMap((unit) => {
+    const grams = byUnit.get(unit)
+    return grams === undefined ? [] : [{ unit, grams }]
+  })
+}
+
+/**
  * Страва з «Моїх страв».
  * @param {unknown} input
  * @returns {Food}
@@ -153,10 +197,10 @@ export function sanitizeFood(input) {
   const name = str(o.name, LIMITS.nameLength)
   if (!name) throw new ValidationError('name')
 
-  const source = o.source === 'off' ? 'off' : o.source === 'own' ? 'own' : null
+  const source = o.source === 'own' ? 'own' : CATALOG_SOURCES.find((s) => s === o.source)
   if (!source) throw new ValidationError('source')
-  const offCode = typeof o.offCode === 'string' && OFF_CODE_RE.test(o.offCode) ? o.offCode : null
-  if (source === 'off' && !offCode) throw new ValidationError('offCode')
+  const offCode = typeof o.offCode === 'string' && CATALOG_CODE_RE.test(o.offCode) ? o.offCode : null
+  if (source !== 'own' && !offCode) throw new ValidationError('offCode')
 
   return {
     id: requireId(o.id),
@@ -168,6 +212,8 @@ export function sanitizeFood(input) {
       : num(o.servingGrams, 'servingGrams', LIMITS.grams.min, LIMITS.grams.max),
     source,
     offCode,
+    portions: sanitizePortions(o.portions),
+    barcode: canonicalEan(o.barcode),
     createdAt: timestamp(o.createdAt, 'createdAt'),
     updatedAt: timestamp(o.updatedAt, 'updatedAt'),
   }

@@ -1,12 +1,13 @@
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion'
-import { Plus, Trash2 } from 'lucide-react'
-import { useRef, useState } from 'react'
-import { MEAL_LABELS, type Entry, type MealType } from '@shared/model.js'
+import { History, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { MEAL_LABELS, portionUnitLabel, type Entry, type MealType } from '@shared/model.js'
 import { sum } from '@shared/nutrition.js'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { IconButton } from '@/components/ui/Button'
-import { removeEntry } from '@/data/store'
+import { copyEntries, loadDay, removeEntry, useDay } from '@/data/store'
 import { cn } from '@/lib/cn'
+import { addDays, toDateKey } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { grams, kcal, macrosLine } from '@/lib/format'
 import { useUiStore } from '@/store/ui'
@@ -21,6 +22,7 @@ export function MealSection({ meal, entries }: MealSectionProps) {
   const openModal = useUiStore((s) => s.openModal)
   const totals = sum(entries)
   const Icon = MEAL_ICONS[meal]
+  const repeat = useYesterdayMeal(meal, entries.length === 0)
 
   // «Стрибок» калорій у заголовку, коли їх стало більше (щойно додали страву)
   const [prevKcal, setPrevKcal] = useState(totals.kcal)
@@ -65,6 +67,31 @@ export function MealSection({ meal, entries }: MealSectionProps) {
           <Plus className="size-5" />
         </IconButton>
       </header>
+
+      {/* Порожній прийом їжі, а вчора в ньому щось було — повторити одним тапом */}
+      <AnimatePresence initial={false}>
+        {repeat && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <button
+              type="button"
+              onClick={repeat.run}
+              aria-label={`${MEAL_LABELS[meal]} як учора: ${repeat.names}`}
+              className="mx-4 mb-3 flex w-[calc(100%-2rem)] items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-left text-xs text-muted ring-1 ring-white/[0.06] ring-inset transition-colors active:bg-white/[0.08]"
+            >
+              <History className="size-4 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1 truncate">
+                <b className="text-fg">Як учора</b> · {repeat.names}
+              </span>
+              <span className="shrink-0 font-semibold text-fg">{kcal(repeat.kcal)} ккал</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Список завжди змонтований — тоді анімуються і перший доданий, і останній видалений запис */}
       <ul className={cn('transition-[border-color]', entries.length ? 'border-t border-line pb-1' : 'border-t border-transparent')}>
@@ -141,6 +168,7 @@ function EntryRow({ entry }: { entry: Entry }) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{entry.name}</p>
             <p className="truncate text-xs text-muted">
+              {entry.portion && `${grams(entry.portion.count)} ${portionUnitLabel(entry.portion.unit, entry.portion.count)} · `}
               {entry.grams !== null && `${grams(entry.grams)} г · `}
               {macrosLine(entry)}
             </p>
@@ -150,4 +178,35 @@ function EntryRow({ entry }: { entry: Entry }) {
       </motion.div>
     </motion.li>
   )
+}
+
+/**
+ * «Як учора» для порожнього прийому їжі сьогодні: учорашні страви цього ж прийому, якщо вони є.
+ * Лише для сьогодні — інакше гортання днів тягнуло б із сервера ще й попередній день до кожного.
+ * Запити дедуплікуються в loadDay.
+ */
+function useYesterdayMeal(meal: MealType, emptyMeal: boolean) {
+  const date = useUiStore((s) => s.selectedDate)
+  const empty = emptyMeal && date === toDateKey()
+  const yesterday = addDays(date, -1)
+  const day = useDay(yesterday)
+  const [copying, setCopying] = useState(false)
+
+  useEffect(() => {
+    if (empty && !day.loaded) void loadDay(yesterday)
+  }, [empty, day.loaded, yesterday])
+  // після копіювання прийом уже не порожній — скидаємо позначку на наступний раз
+  if (!empty && copying) setCopying(false)
+
+  const entries = empty && !copying ? day.entries.filter((e) => e.meal === meal) : []
+  if (entries.length === 0) return null
+  return {
+    names: entries.map((e) => e.name).join(', '),
+    kcal: sum(entries).kcal,
+    run: () => {
+      haptic()
+      setCopying(true) // одразу ховаємо кнопку — повторний тап не дасть дублікатів
+      void copyEntries(entries, date, meal).catch(() => setCopying(false)) // помилку покаже тост
+    },
+  }
 }

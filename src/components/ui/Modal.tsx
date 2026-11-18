@@ -1,8 +1,9 @@
 import { AnimatePresence, motion, useDragControls, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { X } from 'lucide-react'
-import { useEffect, useId, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type PointerEvent, type ReactNode } from 'react'
 import { useSheetFlag } from '@/lib/sheetFlag'
-import { useKeyboardInset, useViewportHeight } from '@/lib/viewport'
+import { useScrollLock } from '@/lib/scrollLock'
+import { useKeyboardOpen, useViewportHeight, useViewportTop } from '@/lib/viewport'
 import { IconButton } from './Button'
 
 interface ModalProps {
@@ -17,7 +18,11 @@ interface ModalProps {
 /**
  * Нижня шторка (bottom sheet).
  * Закривається свайпом вниз за ручку/заголовок, тапом по фону або Esc.
- * Піднімається над екранною клавіатурою, щоб поля й кнопка лишались видимими.
+ *
+ * Клавіатура: шар шторки займає рівно видиму область (visualViewport), тож шторка
+ * завжди стоїть над клавіатурою — і коли iOS сам зсуває видиму область до поля,
+ * шторка їде разом із нею, а не підскакує вдруге. Сторінка під шторкою заблокована
+ * (useScrollLock), щоб iOS не прокручував головний екран.
  */
 export function Modal({ open, title, onClose, children, tall = false }: ModalProps) {
   const titleId = useId()
@@ -26,23 +31,32 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
   // Під час появи/закриття y — рядок '100%' (тоді фоном керує обгортка), під час перетягування — пікселі.
   const y = useMotionValue<number | string>(0)
   const backdropOpacity = useTransform(y, (v) => (typeof v === 'number' ? Math.min(Math.max(1 - v / 320, 0), 1) : 1))
-  const keyboard = useKeyboardInset()
+  const keyboard = useKeyboardOpen()
   useSheetFlag(open)
+  useScrollLock(open)
   const viewport = useViewportHeight()
+  const viewportTop = useViewportTop()
+  const scroller = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-    }
+    return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  // Клавіатура відкрилась чи змінила висоту, або фокус перейшов на інше поле —
+  // поле має бути видно над липкою кнопкою внизу (браузер про неї не знає).
+  useEffect(() => {
+    const box = scroller.current
+    if (!open || !box) return
+    const reveal = () => requestAnimationFrame(() => revealFocused(box))
+    reveal()
+    box.addEventListener('focusin', reveal)
+    return () => box.removeEventListener('focusin', reveal)
+  }, [open, viewport])
 
   const startDrag = (e: PointerEvent) => drag.start(e)
   const maxHeight = `calc(${viewport}px - env(safe-area-inset-top) - 0.75rem)`
@@ -54,7 +68,8 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-end justify-center"
+          className="fixed inset-x-0 top-0 z-50 flex items-end justify-center"
+          style={{ top: viewportTop, height: viewport }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -65,9 +80,9 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
             aria-modal="true"
             aria-labelledby={titleId}
             // data-kb: клавіатура відкрита — низу шторки не потрібен відступ під home indicator
-            data-kb={keyboard > 0 || undefined}
+            data-kb={keyboard || undefined}
             className="group relative flex w-full max-w-[480px] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-line bg-card shadow-2xl"
-            style={{ y, marginBottom: keyboard, maxHeight, ...(tall ? { height: maxHeight } : {}) }}
+            style={{ y, maxHeight, ...(tall ? { height: maxHeight } : {}) }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -93,7 +108,9 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
                 </IconButton>
               </div>
             </div>
-            <div className="flex flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-2">{children}</div>
+            <div ref={scroller} className="flex flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-2">
+              {children}
+            </div>
           </motion.div>
         </motion.div>
       )}
@@ -101,10 +118,29 @@ export function Modal({ open, title, onClose, children, tall = false }: ModalPro
   )
 }
 
+/** Відступ між полем у фокусі й краєм видимої частини шторки. */
+const REVEAL_GAP = 12
+
+/** Прокручує вміст шторки так, щоб поле у фокусі було між верхом і липкою кнопкою внизу. */
+function revealFocused(box: HTMLElement) {
+  const el = document.activeElement
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) || !box.contains(el)) return
+  const area = box.getBoundingClientRect()
+  const footer = box.querySelector<HTMLElement>('[data-sheet-footer]')
+  const top = area.top + REVEAL_GAP
+  const bottom = area.bottom - (footer?.offsetHeight ?? 0) - REVEAL_GAP
+  const r = el.getBoundingClientRect()
+  if (r.bottom > bottom) box.scrollTop += r.bottom - bottom
+  else if (r.top < top) box.scrollTop -= top - r.top
+}
+
 /** Низ шторки з головною кнопкою: прилипає до низу, тож видимий і над клавіатурою. */
 export function SheetFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-0 -mx-5 mt-auto flex gap-3 border-t border-line bg-card px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] group-data-[kb]:pb-3">
+    <div
+      data-sheet-footer
+      className="sticky bottom-0 -mx-5 mt-auto flex gap-3 border-t border-line bg-card px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] group-data-[kb]:pb-3"
+    >
       {children}
     </div>
   )

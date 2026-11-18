@@ -4,8 +4,10 @@ import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { CoinIcon } from '@/components/CoinIcon'
 import { useGame } from '@/data/store'
 import { toDateKey } from '@/lib/date'
+import { cn } from '@/lib/cn'
 import { int } from '@/lib/format'
 import { useUiStore } from '@/store/ui'
+import { FLAME_RING_OFF, flameFill, flameGlow, flameStyle } from './flameTier'
 import { useClaimableCount } from './useClaimableCount'
 
 /** HUD гейміфікації: баланс калокоїнів, серія днів (+щити-заморозки), ачівки. */
@@ -15,7 +17,10 @@ export function Hud() {
   const claimable = useClaimableCount()
   const coins = game?.coins ?? 0
   const streak = game?.streak ?? 0
-  const boosted = game?.boostDate === toDateKey()
+  const today = toDateKey()
+  const boosted = game?.boostDate === today
+  // Як у Duolingo: поки сьогодні нічого не записано, вогник сірий; перший запис — і він спалахує
+  const lit = streak > 0 && game?.lastActiveDate === today
 
   return (
     <div className="card flex items-center gap-2 rounded-2xl p-2">
@@ -72,22 +77,33 @@ export function Hud() {
         </span>
       </motion.button>
 
-      {/* Серія */}
-      <span
-        title={`Днів поспіль: ${streak}`}
-        className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-streak/10 px-3 text-base font-bold ring-1 ring-inset ring-streak/25"
+      {/* Серія — відкриває шторку «Серія» */}
+      <motion.button
+        type="button"
+        onClick={() => openModal({ type: 'streak' })}
+        whileTap={{ scale: 0.94 }}
+        aria-label={`Серія: ${streak} днів поспіль, ${lit ? 'сьогодні зараховано' : 'сьогодні ще без запису'}`}
+        className={cn(
+          'flex h-10 shrink-0 items-center gap-1 rounded-full px-3 text-base font-bold transition-colors duration-500',
+          lit ? 'bg-streak/10' : 'bg-white/[0.04] text-muted',
+        )}
+        // вогник розпалюється з серією: жовтий → помаранчевий (7) → червоний (30) → розпечений (100)
+        // обводка (FLAME_RING_PX) і світіння — з flameTier.ts, однакові для всіх рівнів
+        style={(lit ? { ...flameStyle(streak), ...flameGlow(streak) } : FLAME_RING_OFF) as MotionStyle}
       >
         <motion.span
-          key={streak} // одноразовий спалах при зміні серії (без нескінченної анімації)
+          key={`${streak}-${lit}`} // одноразовий спалах, коли серія змінилась або день зараховано
           initial={{ scale: 1 }}
-          animate={streak > 0 ? { scale: [1, 1.35, 1], rotate: [0, -10, 0] } : {}}
+          animate={lit ? { scale: [1, 1.45, 1], rotate: [0, -12, 0] } : {}}
           transition={{ duration: 0.6 }}
           className="flex"
         >
-          <Flame className={streak > 0 ? 'size-5 fill-streak/40 text-streak' : 'size-5 text-muted'} />
+          <Flame
+            className={cn('size-5 transition-colors duration-500', lit ? `${flameFill(streak)} text-streak` : 'text-muted')}
+          />
         </motion.span>
         {streak}
-      </span>
+      </motion.button>
 
       {/* Ачівки */}
       <motion.button

@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * Екранна клавіатура на телефоні. На iOS вона не змінює розмір сторінки,
- * а просто перекриває її знизу — тож висоту рахуємо через visualViewport.
+ * Екранна клавіатура на телефоні. На iOS (і в Chrome на Android) вона не змінює розмір
+ * сторінки, а перекриває її знизу, а щоб показати поле — зсуває видиму область вниз.
+ * Тому розмір і зсув видимої області беремо з visualViewport.
  */
 function subscribe(onChange: () => void): () => void {
   const vv = window.visualViewport
@@ -14,19 +15,29 @@ function subscribe(onChange: () => void): () => void {
   }
 }
 
-/** Скільки пікселів знизу закрито клавіатурою (0, якщо вона схована). */
-export function useKeyboardInset(): number {
+/**
+ * visualViewport, лише якщо сторінку не збільшено жестом: при масштабуванні видима область
+ * теж менша за вікно, але це не клавіатура — тоді шторка лишається як без масштабу.
+ */
+function unzoomed(): VisualViewport | null {
+  const vv = window.visualViewport
+  return vv && vv.scale < 1.01 ? vv : null
+}
+
+/** Чи відкрита екранна клавіатура (видима область помітно нижча за вікно). */
+export function useKeyboardOpen(): boolean {
   return useSyncExternalStore(subscribe, () => {
-    const vv = window.visualViewport
-    if (!vv) return 0
-    const inset = Math.round(window.innerHeight - vv.height - vv.offsetTop)
-    return inset > 40 ? inset : 0 // дрібні коливання — це панелі браузера, не клавіатура
+    const vv = unzoomed()
+    return !!vv && window.innerHeight - vv.height > 40 // дрібні коливання — це панелі браузера, не клавіатура
   })
 }
 
 /** Видима висота екрана з урахуванням клавіатури. */
 export function useViewportHeight(): number {
-  return useSyncExternalStore(subscribe, () =>
-    Math.round(window.visualViewport?.height ?? window.innerHeight),
-  )
+  return useSyncExternalStore(subscribe, () => Math.round(unzoomed()?.height ?? window.innerHeight))
+}
+
+/** На скільки браузер зсунув видиму область униз, щоб показати поле над клавіатурою. */
+export function useViewportTop(): number {
+  return useSyncExternalStore(subscribe, () => Math.round(unzoomed()?.offsetTop ?? 0))
 }

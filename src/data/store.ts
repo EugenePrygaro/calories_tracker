@@ -5,6 +5,7 @@ import {
   type BodyField,
   type BodyRecord,
   type Entry,
+  type EntryPortion,
   type Food,
   type FoodItem,
   type Goals,
@@ -345,6 +346,9 @@ async function sendOp(op: OutboxOp): Promise<void> {
       if (!res.applied) putFoodLocal(res.food)
       return
     }
+    case 'deleteFood':
+      await api.deleteFood(op.id)
+      return
   }
 }
 
@@ -427,6 +431,8 @@ export type EntryDraft =
       name: string
       grams: string | number
       per100: { kcal: string | number; protein: string | number; fat: string | number; carbs: string | number }
+      /** Додали порцією («2 штуки») — щоб у щоденнику було видно не лише грами */
+      portion?: EntryPortion | null
     }
   | {
       mode: 'quick'
@@ -506,7 +512,10 @@ export async function copyEntries(
   }
 }
 
-export type EntryPatch = Partial<Pick<Entry, 'name' | 'grams' | 'kcal' | 'protein' | 'fat' | 'carbs'>>
+/** `portion: null` — запис більше не порцією (грами змінили вручну). */
+export type EntryPatch = Partial<Pick<Entry, 'name' | 'grams' | 'kcal' | 'protein' | 'fat' | 'carbs'>> & {
+  portion?: EntryPortion | null
+}
 
 /** Для режиму weight нутрієнти перераховуються з per100 у shared/validate.js. */
 export async function updateEntry(prev: Entry, patch: EntryPatch): Promise<void> {
@@ -754,8 +763,37 @@ export async function saveFood(item: FoodItem): Promise<void> {
   if (res && !res.applied) putFoodLocal(res.food)
 }
 
+/** Видалення з «Моїх страв» з можливістю скасувати: тост «Видалено · Повернути». */
+export function removeFood(food: Food): void {
+  haptic(12)
+  useDataStore.setState((s) => ({ foods: s.foods.filter((f) => f.id !== food.id) }))
+  void write(
+    { kind: 'deleteFood', key: foodKey(food.id), id: food.id },
+    () => api.deleteFood(food.id),
+    () => {
+      if (!useDataStore.getState().foods.some((f) => f.id === food.id)) putFoodLocal(food)
+    },
+  ).catch(() => {}) // помилку покаже тост із write()
+  useUiStore.getState().showToast(`Видалено «${food.name}»`, {
+    tone: 'info',
+    action: { label: 'Повернути', run: () => void restoreFood(food).catch(() => {}) },
+  })
+}
+
+/** Повертає щойно видалену страву: той самий id і дата створення, новіша версія. */
+async function restoreFood(food: Food): Promise<void> {
+  const back = sanitizeFood({ ...food, updatedAt: Math.max(Date.now(), food.updatedAt + 1) })
+  putFoodLocal(back)
+  const res = await write(
+    { kind: 'putFood', key: foodKey(back.id), food: back },
+    () => api.putFood(back),
+    () => useDataStore.setState((s) => ({ foods: s.foods.filter((f) => f !== back) })),
+  )
+  if (res && !res.applied) putFoodLocal(res.food)
+}
+
 /** Нова власна страва з ручного вводу. */
-export function newOwnFood(fields: Pick<FoodItem, 'name' | 'per100' | 'servingGrams'>): FoodItem {
+export function newOwnFood(fields: Pick<FoodItem, 'name' | 'per100' | 'servingGrams' | 'portions' | 'barcode'>): FoodItem {
   return {
     id: crypto.randomUUID(),
     brand: null,

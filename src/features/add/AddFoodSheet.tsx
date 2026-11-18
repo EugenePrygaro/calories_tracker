@@ -4,15 +4,19 @@ import { useState } from 'react'
 import { MEAL_LABELS, MEAL_TYPES, type FoodItem, type MealType } from '@shared/model.js'
 import { Segmented } from '@/components/ui/Segmented'
 import { haptic } from '@/lib/haptics'
+import { FoodEditor } from '../foods/FoodEditor'
 import { ManualStep } from './ManualStep'
 import { PortionStep } from './PortionStep'
+import { ScanStep } from './ScanStep'
 import { SearchStep } from './SearchStep'
 import { YesterdayStep } from './YesterdayStep'
 
 type Step =
   | { type: 'search' }
   | { type: 'portion'; item: FoodItem }
-  | { type: 'manual' }
+  | { type: 'editFood'; item: FoodItem }
+  | { type: 'manual'; barcode?: string }
+  | { type: 'scan' }
   | { type: 'yesterday' }
 
 const MEAL_OPTIONS = MEAL_TYPES.map((m) => ({ value: m, label: MEAL_LABELS[m] }))
@@ -25,7 +29,7 @@ const slide = {
 }
 
 /**
- * Додавання їжі: спершу пошук (мої страви + Open Food Facts),
+ * Додавання їжі: спершу пошук (мої страви + публічний: Сільпо, Zakaz.ua, Open Food Facts),
  * далі порція. Якщо нічого не знайшли — вручну або швидкий запис.
  * «З учора» — швидко скопіювати страви з учорашнього раціону.
  */
@@ -80,11 +84,39 @@ export function AddFoodSheet({ initialMeal, onDone }: { initialMeal: MealType; o
               onQuery={setQuery}
               onPick={(item) => go({ type: 'portion', item })}
               onManual={() => go({ type: 'manual' })}
+              onScan={() => go({ type: 'scan' })}
               onYesterday={() => go({ type: 'yesterday' })}
             />
           )}
-          {step.type === 'portion' && <PortionStep item={step.item} meal={meal} onDone={onDone} />}
-          {step.type === 'manual' && <ManualStep meal={meal} initialName={query.trim()} onDone={onDone} />}
+          {step.type === 'portion' && (
+            <PortionStep
+              item={step.item}
+              meal={meal}
+              onDone={onDone}
+              onEditFood={(item) => go({ type: 'editFood', item })}
+            />
+          )}
+          {step.type === 'editFood' && (
+            <FoodEditor
+              food={step.item}
+              onSaved={(item) => go({ type: 'portion', item })}
+              onDeleted={() => go({ type: 'search' })}
+            />
+          )}
+          {step.type === 'manual' && (
+            <ManualStep
+              meal={meal}
+              initialName={step.barcode ? '' : query.trim()}
+              barcode={step.barcode}
+              onDone={onDone}
+            />
+          )}
+          {step.type === 'scan' && (
+            <ScanStep
+              onFound={(item) => go({ type: 'portion', item })}
+              onNotFound={(barcode) => go({ type: 'manual', barcode })}
+            />
+          )}
           {step.type === 'yesterday' && <YesterdayStep meal={meal} onDone={onDone} />}
         </motion.div>
       </AnimatePresence>

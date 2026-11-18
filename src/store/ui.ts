@@ -13,6 +13,9 @@ export type Modal =
   | { type: 'stats' }
   | { type: 'calc' }
   | { type: 'calendar' }
+  /** «Мої страви»; з foodId — одразу редагування цієї страви */
+  | { type: 'foods'; foodId?: string }
+  | { type: 'streak' }
 
 interface Toast {
   id: number

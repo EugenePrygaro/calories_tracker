@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { bodyKey, enqueue, entryKey, overlayBody, overlayDay, overlayProfile, requeueFront } from '../shared/outbox.js'
+import { bodyKey, enqueue, entryKey, foodKey, overlayBody, overlayDay, overlayFoods, overlayProfile, requeueFront } from '../shared/outbox.js'
 
 const entry = (id, over = {}) => ({
   id,
@@ -75,4 +75,20 @@ test('накладання черги на дані з сервера: день,
   const newer = { ...profile, targetWeight: 60, updatedAt: 2 }
   assert.equal(overlayProfile(profile, [{ kind: 'putProfile', key: 'profile', profile: newer }])?.targetWeight, 60)
   assert.equal(overlayProfile(profile, []), profile)
+})
+
+test('страви: видалення в черзі — зникає зі списку; змінили й видалили — лише видалення', () => {
+  const food = (id, updatedAt = 1) => ({ id, name: id, updatedAt })
+  const put = (f) => ({ kind: 'putFood', key: foodKey(f.id), food: f })
+  const del = (id) => ({ kind: 'deleteFood', key: foodKey(id), id })
+
+  let q = enqueue([], put(food('egg', 5)))
+  q = enqueue(q, del('egg'))
+  assert.deepEqual(q, [del('egg')])
+  assert.deepEqual(overlayFoods([food('egg'), food('rice')], q).map((f) => f.id), ['rice'])
+
+  // видалили, а потім повернули — лише збереження
+  q = enqueue(q, put(food('egg', 9)))
+  assert.deepEqual(q, [put(food('egg', 9))])
+  assert.deepEqual(overlayFoods([food('rice')], q).map((f) => f.id), ['egg', 'rice'])
 })

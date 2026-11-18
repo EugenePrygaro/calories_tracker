@@ -10,15 +10,17 @@ import {
   CalcSheet,
   CalendarSheet,
   EditEntryForm,
+  FoodsSheet,
   GoalsForm,
   ShopSheet,
   StatsSheet,
+  StreakSheet,
 } from './lazySheets'
 
 /** Шторки, з якими стоять біля кухонної ваги: поки вони відкриті, екран не гасне. */
 const KEEP_AWAKE: ReadonlySet<ModalState['type']> = new Set(['add', 'edit', 'calc'])
 
-const TALL: ReadonlySet<ModalState['type']> = new Set(['add', 'body', 'achievements', 'shop', 'stats', 'calc'])
+const TALL: ReadonlySet<ModalState['type']> = new Set(['add', 'body', 'achievements', 'shop', 'stats', 'calc', 'foods'])
 
 function titleOf(m: ModalState): string {
   switch (m.type) {
@@ -40,6 +42,10 @@ function titleOf(m: ModalState): string {
       return 'Калькулятор порцій'
     case 'calendar':
       return 'Календар'
+    case 'foods':
+      return 'Мої страви'
+    case 'streak':
+      return 'Серія'
   }
 }
 
@@ -74,6 +80,8 @@ export function ModalHost() {
       {shown?.type === 'stats' && <StatsSheet />}
       {shown?.type === 'calc' && <CalcSheet />}
       {shown?.type === 'calendar' && <CalendarSheet onDone={close} />}
+      {shown?.type === 'foods' && <FoodsSheet key={shown.foodId ?? 'list'} foodId={shown.foodId} />}
+      {shown?.type === 'streak' && <StreakSheet />}
       </Suspense>
     </Modal>
   )

@@ -2,11 +2,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Bug, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { ACHIEVEMENTS } from '@shared/achievements.js'
+import type { GameState } from '@shared/game.js'
 import type { DevOp } from '@/data/api'
 import { gameAction, useDataStore, useGame } from '@/data/store'
 import { GROUP_ORDER, GROUPS } from '@/features/game/achievementStyle'
 import { ALL_THEMES, THEME_LOOK } from '@/features/game/themeStyle'
-import { toDateKey } from '@/lib/date'
+import { addDays, toDateKey } from '@/lib/date'
 import { SOUND_LABELS, play, type SoundName } from '@/lib/sound'
 import { useGameUi } from '@/store/gameUi'
 import { useUiStore } from '@/store/ui'
@@ -163,6 +164,28 @@ function GameDev() {
         <B onClick={() => run('clearToday')} busy={busy}>Скинути денні нагороди</B>
       </Group>
 
+      <Group title="Серія — перегляд (лише тут, до оновлення даних)">
+        {[3, 12, 45, 120].map((n) => (
+          <B key={n} onClick={() => previewStreak({ streak: n, lastActiveDate: today })}>
+            {n} {n === 3 ? 'дні' : 'днів'}
+          </B>
+        ))}
+        <B onClick={() => previewStreak({ lastActiveDate: addDays(today, -1) })}>Сьогодні ще ні</B>
+        <B onClick={() => previewStreak({ lastActiveDate: addDays(today, -3), shields: 1 })}>Пропуск 2 дні + щит</B>
+        <B onClick={() => previewStreak({ lastActiveDate: addDays(today, -4), shields: 0 })}>Не врятувати</B>
+        <B
+          onClick={() =>
+            previewStreak({
+              lostStreak: { value: 12, weeksPaid: 1, date: today },
+              inventory: { ...(game?.inventory ?? { cheatMeal: 0, boost: 0, superFlame: 0, temu: 0 }), superFlame: 1 },
+            })
+          }
+        >
+          Обірвана серія
+        </B>
+        <B onClick={() => useUiStore.getState().openModal({ type: 'streak' })}>Відкрити «Серію»</B>
+      </Group>
+
       <Group title="Перегляд без змін на сервері">
         <B
           onClick={() => {
@@ -199,6 +222,14 @@ function GameDev() {
       </Group>
     </>
   )
+}
+
+/** Підмінити стан серії лише в цьому браузері — подивитися вогник і шторку «Серія». */
+function previewStreak(patch: Partial<GameState>) {
+  const game = useDataStore.getState().game
+  if (!game) return
+  const next = { ...game, streak: game.streak || 5, ...patch }
+  useDataStore.setState({ game: { ...next, bestStreak: Math.max(next.bestStreak, next.streak) } })
 }
 
 function dayAwards(day: { meals: string[]; protein: boolean; kcal: boolean } | undefined): string {

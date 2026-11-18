@@ -54,6 +54,15 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         // обробка пуш-сповіщень (public/push-sw.js)
         importScripts: ['push-sw.js'],
+        // WASM сканера штрихкодів (~1 МБ, лише для iPhone): не в оболонці застосунку, а з першого
+        // відкриття сканера — тоді з кешу й без мережі
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.endsWith('.wasm'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'scanner-wasm', expiration: { maxEntries: 2 } },
+          },
+        ],
       },
     }),
   ],

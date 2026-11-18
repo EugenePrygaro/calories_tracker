@@ -13,7 +13,8 @@
  *   ct:usage:ready       string  позначка: лічильники вже побудовано з історії
  *   ct:push              hash    endpoint → підписка пристрою на пуші (server/push.js)
  *   ct:push:state        string  що й коли вже надіслано вечірнім кроном (shared/notify.js)
- *   ct:off:<запит>       string  FoodItem[] — кеш пошуку Open Food Facts, TTL 1 доба
+ *   ct:search:<запит>    string  FoodItem[] — кеш публічного пошуку (Сільпо, Zakaz.ua, OFF), TTL 1 доба
+ *   ct:ean:<штрихкод>    string  FoodItem[] (0 або 1) — кеш пошуку за штрихкодом, TTL 30 діб (не знайдено — доба)
  *
  * Один hash на день: знімок дня читається одним HGETALL,
  * а зміна чи видалення запису — один HSET / HDEL.
@@ -48,7 +49,9 @@ export const KEYS = {
   push: 'ct:push',
   pushState: 'ct:push:state',
   /** @param {string} query нормалізований запит */
-  offSearch: (query) => `ct:off:${query}`,
+  search: (query) => `ct:search:${query}`,
+  /** @param {string} ean canonicalEan */
+  ean: (ean) => `ct:ean:${ean}`,
 }
 
 /** @type {RedisClient | null} */

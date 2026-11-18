@@ -124,6 +124,8 @@ export const api = {
   putFood: (food: Food) =>
     request<{ applied: boolean; food: Food }>('PUT', `/api/foods?id=${q(food.id)}`, { food }),
 
+  deleteFood: (id: string) => request<{ ok: true }>('DELETE', `/api/foods?id=${q(id)}`),
+
   getBody: () => request<{ records: BodyRecord[] }>('GET', '/api/body'),
 
   putBody: (record: BodyRecord) =>
@@ -144,9 +146,16 @@ export const api = {
 
   gameAction: (body: GameAction) => request<GameResult>('POST', '/api/game', body),
 
-  /** Пошук у Open Food Facts через наш сервер (фільтр energy-kcal_100g + кеш). */
+  /** Публічний пошук (Сільпо → Zakaz.ua → Open Food Facts) через наш сервер: лише продукти з калоріями, кеш. */
   search: (query: string, signal?: AbortSignal) =>
     request<{ results: FoodItem[] }>('GET', `/api/search?q=${q(query)}`, undefined, {
+      ...(signal ? { signal } : {}),
+      cache: 'default',
+    }),
+
+  /** Продукт за штрихкодом (сканер): ті самі джерела, перший знайдений; [] — ніде немає. */
+  searchEan: (ean: string, signal?: AbortSignal) =>
+    request<{ results: FoodItem[] }>('GET', `/api/search?ean=${q(ean)}`, undefined, {
       ...(signal ? { signal } : {}),
       cache: 'default',
     }),

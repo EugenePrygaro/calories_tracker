@@ -14,6 +14,7 @@ import { RewardFeed } from '@/features/game/RewardFeed'
 import { StreakNotice } from '@/features/game/StreakNotice'
 import { DevPanel } from '@/features/lazySheets'
 import { MealSection } from '@/features/MealSection'
+import { FoodsCard } from '@/features/foods/FoodsCard'
 import { StatsCard } from '@/features/stats/StatsCard'
 import { ModalHost } from '@/features/ModalHost'
 import { cn } from '@/lib/cn'
@@ -70,7 +71,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative mx-auto flex w-full max-w-[480px] flex-col gap-4 overflow-x-clip px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+    <div className="relative mx-auto flex w-full max-w-[480px] flex-col gap-4 overflow-x-clip px-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
       <DateHeader />
       <StreakNotice />
 
@@ -130,6 +131,9 @@ export default function App() {
       </motion.div>
       <motion.div custom={6} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_260px] [content-visibility:auto]">
         <StatsCard />
+      </motion.div>
+      <motion.div custom={7} variants={intro} initial={introPlayed ? false : 'hidden'} animate="show" className="[contain-intrinsic-size:auto_120px] [content-visibility:auto]">
+        <FoodsCard />
       </motion.div>
 
       {/* Калькулятор порцій — ліворуч, удвічі менший за «плюс» і на одній з ним осі */}

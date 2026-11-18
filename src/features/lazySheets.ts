@@ -15,6 +15,8 @@ const loaders = {
   stats: () => import('./stats/StatsSheet'),
   calc: () => import('./calc/CalcSheet'),
   calendar: () => import('./stats/CalendarSheet'),
+  foods: () => import('./foods/FoodsSheet'),
+  streak: () => import('./game/StreakSheet'),
 }
 
 export const AddFoodSheet = lazy(() => loaders.add().then((m) => ({ default: m.AddFoodSheet })))
@@ -26,6 +28,8 @@ export const ShopSheet = lazy(() => loaders.shop().then((m) => ({ default: m.Sho
 export const StatsSheet = lazy(() => loaders.stats().then((m) => ({ default: m.StatsSheet })))
 export const CalcSheet = lazy(() => loaders.calc().then((m) => ({ default: m.CalcSheet })))
 export const CalendarSheet = lazy(() => loaders.calendar().then((m) => ({ default: m.CalendarSheet })))
+export const FoodsSheet = lazy(() => loaders.foods().then((m) => ({ default: m.FoodsSheet })))
+export const StreakSheet = lazy(() => loaders.streak().then((m) => ({ default: m.StreakSheet })))
 
 /** DEV-панель — лише коли вона ввімкнена (на Vercel її чанк навіть не завантажується). */
 export const DevPanel = lazy(() => import('./dev/DevPanel').then((m) => ({ default: m.DevPanel })))

@@ -79,3 +79,19 @@ test('sum без накопичення похибки float', () => {
   const items = Array.from({ length: 3 }, () => ({ kcal: 0.1, protein: 0.1, fat: 0.2, carbs: 0.3 }))
   assert.deepEqual(sum(items), { kcal: 0.3, protein: 0.3, fat: 0.6, carbs: 0.9 })
 })
+
+test('weight: порція запису («2 штуки») — зберігається, перевіряється, знімається', () => {
+  const egg = { ...base, mode: 'weight', name: 'Яйце', grams: 120, per100: { kcal: 155, protein: 12.6, fat: 10.6, carbs: 1.1 } }
+  // старі записи й записи «в грамах» — без поля
+  assert.equal('portion' in sanitizeEntry(egg), false)
+  assert.deepEqual(sanitizeEntry({ ...egg, portion: { unit: 'piece', count: '2' } }).portion, { unit: 'piece', count: 2 })
+  assert.deepEqual(sanitizeEntry({ ...egg, portion: { unit: 'package', count: '0,5' } }).portion, { unit: 'package', count: 0.5 })
+  // null — грами змінили вручну
+  assert.equal('portion' in sanitizeEntry({ ...egg, portion: null }), false)
+  assert.throws(() => sanitizeEntry({ ...egg, portion: { unit: 'cup', count: 1 } }), /invalid_portion/)
+  assert.throws(() => sanitizeEntry({ ...egg, portion: { unit: 'piece', count: 0 } }), /invalid_portion/)
+  assert.throws(() => sanitizeEntry({ ...egg, portion: { unit: 'piece', count: 500 } }), /invalid_portion/)
+  // швидкий запис порції не має
+  const quick = sanitizeEntry({ ...base, mode: 'quick', kcal: 100, protein: 5, portion: { unit: 'piece', count: 2 } })
+  assert.equal('portion' in quick, false)
+})

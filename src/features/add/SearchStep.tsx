@@ -1,9 +1,9 @@
-import { ChevronRight, History, LoaderCircle, PencilLine, RotateCcw, Search, X } from 'lucide-react'
+import { ChevronRight, History, LoaderCircle, PencilLine, RotateCcw, ScanBarcode, Search, X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { LIMITS, type FoodItem } from '@shared/model.js'
 import { Button } from '@/components/ui/Button'
 import { SheetFooter } from '@/components/ui/Modal'
-import { filterFoods, useOffSearch } from '@/data/search'
+import { filterFoods, usePublicSearch } from '@/data/search'
 import { loadDay, useDataStore, useDay, useFoods } from '@/data/store'
 import { addDays } from '@/lib/date'
 import { cn } from '@/lib/cn'
@@ -15,6 +15,7 @@ interface SearchStepProps {
   onQuery: (q: string) => void
   onPick: (item: FoodItem) => void
   onManual: () => void
+  onScan: () => void
   onYesterday: () => void
 }
 
@@ -27,7 +28,7 @@ const SORTS: { value: Sort; label: string }[] = [
 /** Скільки страв показувати в «Нещодавні» / «Часті». */
 const TOP = 15
 
-export function SearchStep({ query, onQuery, onPick, onManual, onYesterday }: SearchStepProps) {
+export function SearchStep({ query, onQuery, onPick, onManual, onScan, onYesterday }: SearchStepProps) {
   const foods = useFoods()
   const foodsLoaded = useDataStore((s) => s.foodsLoaded)
   const usage = useDataStore((s) => s.foodUsage)
@@ -42,8 +43,9 @@ export function SearchStep({ query, onQuery, onPick, onManual, onYesterday }: Se
       : sort === 'frequent'
         ? [...used].sort((a, b) => (usage[b.id]?.n ?? 0) - (usage[a.id]?.n ?? 0)).slice(0, TOP)
         : foods
-  const off = useOffSearch(query)
+  const pub = usePublicSearch(query)
   const searching = query.trim().length >= LIMITS.searchQuery.min
+  const openModal = useUiStore((s) => s.openModal)
   const yesterday = addDays(useUiStore((s) => s.selectedDate), -1)
   const yesterdayDay = useDay(yesterday)
   const yesterdayCount = yesterdayDay.entries.length
@@ -61,17 +63,24 @@ export function SearchStep({ query, onQuery, onPick, onManual, onYesterday }: Se
             type="search"
             enterKeyHint="search"
             autoComplete="off"
-            autoFocus
             value={query}
             onChange={(e) => onQuery(e.target.value)}
             placeholder="Пошук страви або продукту"
             className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-muted/60 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
-            <button type="button" aria-label="Очистити" onClick={() => onQuery('')} className="-mr-1 p-1 text-muted">
+            <button type="button" aria-label="Очистити" onClick={() => onQuery('')} className="p-1 text-muted">
               <X className="size-5" />
             </button>
           )}
+          <button
+            type="button"
+            aria-label="Сканувати штрихкод"
+            onClick={onScan}
+            className="-mr-1.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary active:bg-primary/25"
+          >
+            <ScanBarcode className="size-5" />
+          </button>
         </label>
       </div>
 
@@ -95,7 +104,17 @@ export function SearchStep({ query, onQuery, onPick, onManual, onYesterday }: Se
         </button>
       )}
 
-      <Section title="Мої страви" count={foodsLoaded && query.trim() ? mine.length : undefined}>
+      <Section
+        title="Мої страви"
+        count={foodsLoaded && query.trim() ? mine.length : undefined}
+        action={
+          foods.length > 0 ? (
+            <button type="button" onClick={() => openModal({ type: 'foods' })} className="flex items-center gap-0.5 normal-case tracking-normal text-primary">
+              Керувати <ChevronRight className="size-3.5" />
+            </button>
+          ) : undefined
+        }
+      >
         {!query.trim() && (
           <div role="radiogroup" aria-label="Порядок моїх страв" className="flex gap-1.5 px-1 pb-2">
             {SORTS.map((s) => (
@@ -133,21 +152,21 @@ export function SearchStep({ query, onQuery, onPick, onManual, onYesterday }: Se
       </Section>
 
       {searching && (
-        <Section title="Публічний пошук" count={off.status === 'done' ? off.results.length : undefined}>
-          {off.status === 'loading' && (
+        <Section title="Публічний пошук" count={pub.status === 'done' ? pub.results.length : undefined}>
+          {pub.status === 'loading' && (
             <Hint>
               <LoaderCircle className="size-4 animate-spin" /> Шукаємо…
             </Hint>
           )}
-          {off.status === 'error' && (
-            <button type="button" onClick={off.retry} className="flex items-center gap-2 px-2 py-3 text-sm text-warning">
+          {pub.status === 'error' && (
+            <button type="button" onClick={pub.retry} className="flex items-center gap-2 px-2 py-3 text-sm text-warning">
               <RotateCcw className="size-4" /> Помилка пошуку · Повторити
             </button>
           )}
-          {off.status === 'done' &&
-            (off.results.length > 0 ? (
+          {pub.status === 'done' &&
+            (pub.results.length > 0 ? (
               <ul>
-                {off.results.map((item) => (
+                {pub.results.map((item) => (
                   <FoodRow key={item.id} item={item} saved={savedIds.has(item.id)} onPick={onPick} />
                 ))}
               </ul>
@@ -166,12 +185,23 @@ export function SearchStep({ query, onQuery, onPick, onManual, onYesterday }: Se
   )
 }
 
-function Section({ title, count, children }: { title: string; count?: number | undefined; children: ReactNode }) {
+function Section({
+  title,
+  count,
+  action,
+  children,
+}: {
+  title: string
+  count?: number | undefined
+  action?: ReactNode
+  children: ReactNode
+}) {
   return (
     <section className="flex flex-col pb-2">
       <h3 className="flex items-baseline gap-2 px-2 pt-1 pb-1 text-xs font-bold tracking-wider text-muted uppercase">
         {title}
         {count !== undefined && <span className="font-normal opacity-70">{count}</span>}
+        {action && <span className="ml-auto">{action}</span>}
       </h3>
       {children}
     </section>

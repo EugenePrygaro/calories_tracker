@@ -45,6 +45,11 @@ export function sendCdnCached(res, body, seconds) {
   send(res, 200, body, 'public, max-age=3600')
 }
 
+/** Скільки мс лишилось до дедлайну (мітка часу; Infinity — без обмеження). @param {number} deadline */
+export function timeLeft(deadline) {
+  return Math.max(0, deadline - Date.now())
+}
+
 /** Тіло запиту як об'єкт (Vercel розбирає JSON сам, але підстрахуємося). @param {ApiRequest} req */
 export function readJson(req) {
   /** @type {unknown} */
