@@ -24,14 +24,30 @@ applyTheme(readCachedTheme())
 
 // Нова версія застосунку: оновлюємось, коли вкладку сховали, — не перериваємо введення
 let updateReady = false
+let registration: ServiceWorkerRegistration | undefined
+let lastUpdateCheck = Date.now()
+/** Не частіше — перевірка це один маленький запит sw.js (no-cache), але й він не потрібен щохвилини. */
+const UPDATE_CHECK_MS = 5 * 60 * 1000
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
     updateReady = true
   },
+  onRegisteredSW(_url, reg) {
+    registration = reg
+  },
 })
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && updateReady) void updateSW(true)
+  if (document.visibilityState === 'hidden') {
+    if (updateReady) void updateSW(true)
+    return
+  }
+  // iPhone тримає застосунок із головного екрана в пам'яті й при поверненні не перезавантажує —
+  // без цього нову версію не було б видно, доки iOS сама його не вивантажить.
+  // Знайдену версію застосовуємо, як і раніше, при наступному згортанні.
+  if (Date.now() - lastUpdateCheck < UPDATE_CHECK_MS) return
+  lastUpdateCheck = Date.now()
+  void registration?.update().catch(() => {}) // без мережі — спробуємо наступного разу
 })
 startAutoRefresh()
 void resyncPush() // раз на добу освіжає підписку на сповіщення (якщо ввімкнені)
